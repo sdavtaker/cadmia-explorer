@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "phase-1-visualization"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Python: lint + unit tests
+  # -------------------------------------------------------------------------
+  python:
+    name: Python lint & tests
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pipenv
+        run: pip install pipenv
+
+      - name: Install dependencies
+        run: pipenv install --dev
+
+      - name: Lint (ruff)
+        run: ./scripts/lint_python.sh
+
+      - name: Unit tests (pytest)
+        run: ./scripts/test_python.sh
+
+  # -------------------------------------------------------------------------
+  # C++: build + end-to-end tests
+  # -------------------------------------------------------------------------
+  cpp:
+    name: C++ build & e2e tests
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y cmake g++
+
+      - name: Build cadvis
+        run: ./scripts/build_cpp.sh
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pipenv
+        run: pip install pipenv
+
+      - name: Install Python dependencies
+        run: pipenv install
+
+      - name: End-to-end tests
+        run: ./scripts/test_e2e.sh

@@ -1,0 +1,15 @@
+[tool.pytest.ini_options]
+# Make preprocess/ importable from tests without installing it as a package.
+pythonpath = ["preprocess"]
+testpaths = ["tests"]
+addopts = "-v"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# E/W: pycodestyle errors/warnings, F: pyflakes, I: import order
+select = ["E", "W", "F", "I"]
+ignore = [
+    "E501",  # line too long — enforced by line-length above, but tolerate long SVG format strings
+]

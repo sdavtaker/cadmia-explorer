@@ -97,6 +97,26 @@ the original string is shown on the Y axis.
 | `counter_log.jsonl` | FastGen, SlowGen, Counter | Generators are null-output (IC only); Counter has integer outputs |
 | `job_tracker_log.jsonl` | G1-G4, P, S1-S4 | G1-G4 and P null; S1-S4 have compound string outputs like `"[j1:1, j1:1]"` |
 
+## Validation Checklist
+
+Run this before every commit and before marking any task complete:
+
+```bash
+./scripts/lint_python.sh   # ruff: must be clean (0 errors)
+./scripts/test_python.sh   # pytest: all 43+ tests must pass
+./scripts/build_cpp.sh     # cmake build: must succeed with no errors
+./scripts/test_e2e.sh      # end-to-end pipeline: all SVG checks must pass
+```
+
+Or run the full suite at once:
+
+```bash
+./scripts/ci.sh
+```
+
+The CI workflow (`.github/workflows/ci.yml`) runs these same scripts on every push and PR.
+**Do not commit if any script fails.**
+
 ## Python Environment
 
 **Always use pipenv** — never invoke `python` or `pip` directly.
