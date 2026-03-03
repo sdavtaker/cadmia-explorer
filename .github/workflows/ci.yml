@@ -13,6 +13,8 @@ jobs:
   python:
     name: Python lint & tests
     runs-on: ubuntu-22.04
+    env:
+      PIPENV_PYTHON: python
 
     steps:
       - uses: actions/checkout@v4
@@ -26,8 +28,6 @@ jobs:
 
       - name: Install dependencies
         run: pipenv install --dev
-        env:
-          PIPENV_PYTHON: python
 
       - name: Lint (ruff)
         run: ./scripts/lint_python.sh
@@ -41,6 +41,8 @@ jobs:
   cpp:
     name: C++ build & e2e tests
     runs-on: ubuntu-22.04
+    env:
+      PIPENV_PYTHON: python
 
     steps:
       - uses: actions/checkout@v4
@@ -62,8 +64,6 @@ jobs:
 
       - name: Install Python dependencies
         run: pipenv install
-        env:
-          PIPENV_PYTHON: python
 
       - name: End-to-end tests
         run: ./scripts/test_e2e.sh
