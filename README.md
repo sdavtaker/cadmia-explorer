@@ -18,11 +18,14 @@ cadmia-explorer turns those logs into visual plots — one per component — sho
 
 ## Quick Start (Phase 1: SVG Output)
 
-**Prerequisites**: Python 3.8+, CMake 3.20+, a C++23 compiler.
+**Prerequisites**: Python 3.12+, pipenv, CMake 3.20+, a C++23 compiler.
 
 ```bash
+# 0. Set up the Python environment (first time only)
+pipenv install
+
 # 1. Preprocess a log into the intermediate binary format
-python preprocess/preprocess.py \
+pipenv run python preprocess/preprocess.py \
     --log test_logs/4gp_log.jsonl \
     --output out.cadvis
 
@@ -49,7 +52,7 @@ def map_output(s: str) -> int:
 ```
 
 ```bash
-python preprocess/preprocess.py \
+pipenv run python preprocess/preprocess.py \
     --log test_logs/job_tracker_log.jsonl \
     --map my_map.py \
     --output out.cadvis

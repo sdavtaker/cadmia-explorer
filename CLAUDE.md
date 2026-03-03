@@ -97,14 +97,35 @@ the original string is shown on the Y axis.
 | `counter_log.jsonl` | FastGen, SlowGen, Counter | Generators are null-output (IC only); Counter has integer outputs |
 | `job_tracker_log.jsonl` | G1-G4, P, S1-S4 | G1-G4 and P null; S1-S4 have compound string outputs like `"[j1:1, j1:1]"` |
 
+## Python Environment
+
+**Always use pipenv** — never invoke `python` or `pip` directly.
+
+```bash
+# Install / sync dependencies (first time or after Pipfile changes)
+pipenv install
+
+# Run a script
+pipenv run python preprocess/preprocess.py --log test_logs/4gp_log.jsonl --output out.cadvis
+
+# Run tests
+pipenv run pytest preprocess/
+
+# Add a new dependency
+pipenv install <package>
+
+# Add a dev-only dependency
+pipenv install --dev <package>
+```
+
 ## Commands
 
 ```bash
 # Preprocess a log
-python preprocess/preprocess.py --log test_logs/4gp_log.jsonl --output out.cadvis
+pipenv run python preprocess/preprocess.py --log test_logs/4gp_log.jsonl --output out.cadvis
 
 # Preprocess with output mapping
-python preprocess/preprocess.py --log test_logs/job_tracker_log.jsonl \
+pipenv run python preprocess/preprocess.py --log test_logs/job_tracker_log.jsonl \
     --map examples/job_map.py --output out.cadvis
 
 # Render SVGs (all components)

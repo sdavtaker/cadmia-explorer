@@ -95,7 +95,7 @@ src/
 ### CLI
 
 ```
-python preprocess/preprocess.py \
+pipenv run python preprocess/preprocess.py \
     --log path/to/sim.jsonl \
     [--map path/to/map_output.py] \
     --output path/to/out.cadvis

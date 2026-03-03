@@ -20,6 +20,9 @@ __pycache__/
 dist/
 .eggs/
 
+# pipenv virtualenv (the venv lives in ~/.local, but guard against local .venv)
+.venv/
+
 # Generated output
 *.cadvis
 svgs/
