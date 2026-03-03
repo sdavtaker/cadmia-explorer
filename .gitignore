@@ -1,3 +1,41 @@
+# Build directories
+build/
+build-*/
+
+# CMake generated
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+install_manifest.txt
+CTestTestfile.cmake
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+dist/
+.eggs/
+
+# Generated output
+*.cadvis
+svgs/
+*.svg
+
+# Emscripten output
+*.wasm
+*.js.map
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
 # Prerequisites
 *.d
 
