@@ -26,6 +26,8 @@ jobs:
 
       - name: Install dependencies
         run: pipenv install --dev
+        env:
+          PIPENV_PYTHON: python
 
       - name: Lint (ruff)
         run: ./scripts/lint_python.sh
@@ -60,6 +62,8 @@ jobs:
 
       - name: Install Python dependencies
         run: pipenv install
+        env:
+          PIPENV_PYTHON: python
 
       - name: End-to-end tests
         run: ./scripts/test_e2e.sh
