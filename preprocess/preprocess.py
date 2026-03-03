@@ -23,9 +23,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Callable, Optional
 
-from interval import Interval, parse_interval
-from cadvis_writer import CadvisWriter, ComponentRecord, RectRecord, EdgeRecord
-
+from cadvis_writer import CadvisWriter, ComponentRecord, EdgeRecord, RectRecord
+from interval import parse_interval
 
 # ---------------------------------------------------------------------------
 # Output mapping

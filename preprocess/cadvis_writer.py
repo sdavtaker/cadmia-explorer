@@ -40,9 +40,10 @@ Format (all integers little-endian):
 """
 
 from __future__ import annotations
+
 import struct
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 
 
 @dataclass

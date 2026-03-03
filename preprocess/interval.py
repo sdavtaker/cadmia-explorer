@@ -11,9 +11,9 @@ Returns an Interval dataclass with float lo/hi and bool closed flags.
 """
 
 from __future__ import annotations
+
 import re
 from dataclasses import dataclass
-
 
 _PATTERN = re.compile(
     r'^([\[\(])\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s*'
