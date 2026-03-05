@@ -62,10 +62,14 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y cmake g++ libgl1-mesa-dev \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev \
-            libxi-dev libxext-dev
+            libxi-dev libxext-dev \
+            clang-format clang-tidy
 
       - name: Build cadvis
         run: ./scripts/build_cpp.sh
+
+      - name: C++ lint (clang-format + clang-tidy)
+        run: ./scripts/lint_cpp.sh
 
       - name: C++ unit tests
         run: ./scripts/test_cpp.sh

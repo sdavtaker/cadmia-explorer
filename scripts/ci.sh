@@ -14,6 +14,9 @@ echo ">>> test_python"
 echo ">>> build_cpp"
 ./scripts/build_cpp.sh
 
+echo ">>> lint_cpp"
+./scripts/lint_cpp.sh
+
 echo ">>> test_cpp"
 ./scripts/test_cpp.sh
 

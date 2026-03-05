@@ -13,9 +13,5 @@
 ///
 /// Handles: rect fills, per-side dashed/solid borders, edges (line/bezier + arrowhead),
 /// axes, multiplicity labels, and ancestor highlighting.
-void render_component(ImDrawList* dl,
-                      const Component& comp,
-                      const Layout& layout,
-                      AppState& state,
-                      ImVec2 canvas_pos,
-                      ImVec2 canvas_size);
+void render_component(ImDrawList *dl, const Component &comp, const Layout &layout, AppState &state,
+                      ImVec2 canvas_pos, ImVec2 canvas_size);

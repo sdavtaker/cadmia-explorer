@@ -108,6 +108,7 @@ Run this before every commit and before marking any task complete:
 ./scripts/lint_python.sh   # ruff: must be clean (0 errors)
 ./scripts/test_python.sh   # pytest: all 43+ tests must pass
 ./scripts/build_cpp.sh     # cmake build: must succeed with no errors
+./scripts/lint_cpp.sh      # clang-format + clang-tidy: must be clean (0 errors)
 ./scripts/test_cpp.sh      # C++ unit tests (Catch2/CTest): all must pass
 ./scripts/test_e2e.sh      # end-to-end pipeline: all SVG checks must pass
 ```
