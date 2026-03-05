@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["main", "phase-2-imgui"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
 
