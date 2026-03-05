@@ -12,7 +12,7 @@
 ///   screen_y = canvas_pos.y + (layout_py / CANVAS_H * canvas_size.y) * zoom + pan_y
 ///
 /// Handles: rect fills, per-side dashed/solid borders, edges (line/bezier + arrowhead),
-/// axes, multiplicity labels, ancestor highlighting, zoom/pan/click input.
+/// axes, multiplicity labels, and ancestor highlighting.
 void render_component(ImDrawList* dl,
                       const Component& comp,
                       const Layout& layout,

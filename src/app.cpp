@@ -8,6 +8,7 @@
 #include <imgui_impl_opengl3.h>
 #include <GLFW/glfw3.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -160,21 +161,18 @@ static void render_canvas(AppState& state, const CadvisFile& file,
     ImGuiIO& io = ImGui::GetIO();
 
     // Pan: drag with left mouse button
-    static bool s_was_active   = false;
-    static bool s_dragged      = false;
-    static bool s_drag_started = false;
+    static bool s_was_active = false;
+    static bool s_dragged    = false;
 
     if (is_active) {
         if (!s_was_active) {
-            s_was_active   = true;
-            s_dragged      = false;
-            s_drag_started = false;
+            s_was_active = true;
+            s_dragged    = false;
         }
         if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f)) {
-            s_dragged      = true;
-            s_drag_started = true;
-            state.pan_x   += io.MouseDelta.x;
-            state.pan_y   += io.MouseDelta.y;
+            s_dragged    = true;
+            state.pan_x += io.MouseDelta.x;
+            state.pan_y += io.MouseDelta.y;
         }
     }
 
@@ -201,9 +199,8 @@ static void render_canvas(AppState& state, const CadvisFile& file,
                 state.is_ancestor.assign(comp.rects.size(), false);
             }
         }
-        s_was_active   = false;
-        s_dragged      = false;
-        s_drag_started = false;
+        s_was_active = false;
+        s_dragged    = false;
     }
 
     // Zoom: scroll wheel (zoom around cursor)
@@ -316,7 +313,12 @@ void run_app(const CadvisFile& file) {
         ImGui::BeginChild("##sidebar", {SIDEBAR_W, 0.0f}, ImGuiChildFlags_Borders);
         bool comp_changed = false;
         render_sidebar(state, file, comp_changed);
-        if (comp_changed) layout_comp = -1; // force rebuild next frame
+        if (comp_changed && !file.components.empty()) {
+            reset_component(state, file, state.cur_comp);
+            Layout::from_component(
+                file.components[static_cast<size_t>(state.cur_comp)], layout);
+            layout_comp = state.cur_comp;
+        }
         ImGui::EndChild();
 
         ImGui::SameLine();

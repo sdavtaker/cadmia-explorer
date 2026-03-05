@@ -126,14 +126,11 @@ static void draw_edges(ImDrawList* dl, const Component& comp,
 
         // Source: center-right of source rect
         double fr_rx = layout.time_to_px(fr.time_lo) + layout.rect_pw(fr);
-        double fr_cy = (layout.out_to_py(fr.out_hi) + layout.out_to_py(fr.out_hi) + layout.rect_ph(fr)) / 2.0;
         ImVec2 sp = {vp.sx(fr_rx), vp.sy(layout.out_to_py(fr.out_hi) + layout.rect_ph(fr) / 2.0)};
 
         // Target: center-left of target rect
         double tr_lx = layout.time_to_px(tr.time_lo);
         ImVec2 tp = {vp.sx(tr_lx), vp.sy(layout.out_to_py(tr.out_hi) + layout.rect_ph(tr) / 2.0)};
-
-        (void)fr_cy;
 
         float dx = std::abs(tp.x - sp.x);
         if (dx < 10.0f) {

@@ -15,7 +15,7 @@ build_reverse_adj(const Component& comp)
 {
     std::vector<std::vector<uint32_t>> rev(comp.rects.size());
     for (const auto& e : comp.edges) {
-        if (e.to < comp.rects.size())
+        if (e.from < comp.rects.size() && e.to < comp.rects.size())
             rev[e.to].push_back(e.from);
     }
     return rev;
@@ -60,7 +60,7 @@ compute_ancestors(const Component& comp,
             continue;
         result[cur] = true;
         for (uint32_t pred : rev_adj[cur]) {
-            if (!result[pred])
+            if (pred < static_cast<uint32_t>(n) && !result[pred])
                 q.push(pred);
         }
     }

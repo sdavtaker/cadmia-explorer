@@ -5,6 +5,7 @@
 #include "reader.h"
 #include "svg.h"
 
+#include <cctype>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -68,6 +69,10 @@ int main(int argc, char* argv[]) {
             input_path = arg;
         }
     }
+
+    // --output-dir alone (without --all or --component) implies --all
+    if (headless_mode && !render_all && filter_component.empty())
+        render_all = true;
 
     if (input_path.empty()) {
         std::cerr << "Error: no input file specified\n";

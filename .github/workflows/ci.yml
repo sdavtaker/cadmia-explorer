@@ -43,6 +43,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       PIPENV_PYTHON: python
+      VCPKG_INSTALLATION_ROOT: /usr/local/share/vcpkg
 
     steps:
       - uses: actions/checkout@v4
