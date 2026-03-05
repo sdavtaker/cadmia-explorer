@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["main", "phase-1-visualization"]
+    branches: ["main", "phase-2-imgui"]
   pull_request:
     branches: ["main"]
 
@@ -36,10 +36,10 @@ jobs:
         run: ./scripts/test_python.sh
 
   # -------------------------------------------------------------------------
-  # C++: build + end-to-end tests
+  # C++: build + unit tests + end-to-end tests
   # -------------------------------------------------------------------------
   cpp:
-    name: C++ build & e2e tests
+    name: C++ build & tests
     runs-on: ubuntu-22.04
     env:
       PIPENV_PYTHON: python
@@ -47,13 +47,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build tools
+      - name: Install build tools and GL/X11 headers
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y cmake g++
+          sudo apt-get install -y cmake g++ libgl1-mesa-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev \
+            libxi-dev libxext-dev
 
       - name: Build cadvis
         run: ./scripts/build_cpp.sh
+
+      - name: C++ unit tests
+        run: ./scripts/test_cpp.sh
 
       - uses: actions/setup-python@v5
         with:

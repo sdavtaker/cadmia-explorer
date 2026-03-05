@@ -17,7 +17,9 @@ simulator is updated.
 - **Preprocessor**: Python 3 (no special dependencies beyond stdlib). Located in `preprocess/`.
 - **Renderer (Phase 1)**: C++23, no external dependencies. Outputs SVG. Located in `src/`.
 - **Renderer (Phase 2+)**: C++23 + Dear ImGui + GLFW + OpenGL3. Same code via Emscripten for WASM.
-- **Build system**: CMake (minimum 3.20).
+- **Build system**: CMake (minimum 3.20) + **vcpkg** (manifest mode) for C++ dependencies.
+- **C++ dependencies**: managed via `vcpkg.json`; pass `-DCMAKE_TOOLCHAIN_FILE` to cmake.
+  `build_cpp.sh` reads `$VCPKG_ROOT` or `$VCPKG_INSTALLATION_ROOT` automatically.
 - **No JavaScript/TypeScript** — the original `prompt.md` specified a React/TS stack; this was
   superseded. Ignore the technology choices in `prompt.md`.
 
@@ -26,7 +28,8 @@ simulator is updated.
 - [x] Requirements clarified (see `PLAN.md`)
 - [x] Log format confirmed (see `log-format.md`)
 - [x] Test logs available in `test_logs/`
-- [ ] **In progress**: Phase 1 — Python preprocessor + C++ SVG renderer
+- [x] Phase 1 complete — Python preprocessor + C++ SVG renderer
+- [ ] **In progress**: Phase 2 — Dear ImGui + GLFW + OpenGL3 interactive viewer
 
 ## File Map
 
@@ -105,6 +108,7 @@ Run this before every commit and before marking any task complete:
 ./scripts/lint_python.sh   # ruff: must be clean (0 errors)
 ./scripts/test_python.sh   # pytest: all 43+ tests must pass
 ./scripts/build_cpp.sh     # cmake build: must succeed with no errors
+./scripts/test_cpp.sh      # C++ unit tests (Catch2/CTest): all must pass
 ./scripts/test_e2e.sh      # end-to-end pipeline: all SVG checks must pass
 ```
 

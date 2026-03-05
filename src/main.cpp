@@ -1,3 +1,6 @@
+#ifdef CADVIS_GUI
+#include "app.h"
+#endif
 #include "layout.h"
 #include "reader.h"
 #include "svg.h"
@@ -16,11 +19,14 @@ static void usage(const char* argv0) {
     std::cerr <<
         "Usage: " << argv0 << " [options] <file.cadvis>\n"
         "\n"
+        "Modes:\n"
+        "  No output flags     Open interactive viewer (Dear ImGui)\n"
+        "  --all               Render all components to SVG files (headless)\n"
+        "  --component NAME    Render only component NAME to SVG (headless)\n"
+        "\n"
         "Options:\n"
-        "  --all                 Render all components (default)\n"
-        "  --component NAME      Render only the component named NAME\n"
-        "  --output-dir DIR      Write SVG files to DIR (default: current directory)\n"
-        "  --help                Show this help\n"
+        "  --output-dir DIR    Write SVG files to DIR (default: current directory)\n"
+        "  --help              Show this help\n"
         "\n"
         "Output: one SVG file per selected component, named <component>.svg\n";
 }
@@ -28,7 +34,8 @@ static void usage(const char* argv0) {
 int main(int argc, char* argv[]) {
     std::string input_path;
     std::string filter_component;
-    bool render_all = true;
+    bool render_all = false;
+    bool headless_mode = false;
     std::string output_dir = ".";
 
     for (int i = 1; i < argc; ++i) {
@@ -39,13 +46,16 @@ int main(int argc, char* argv[]) {
         } else if (arg == "--all") {
             render_all = true;
             filter_component.clear();
+            headless_mode = true;
         } else if (arg == "--component") {
             if (i + 1 >= argc) { std::cerr << "--component requires an argument\n"; return 1; }
             filter_component = argv[++i];
             render_all = false;
+            headless_mode = true;
         } else if (arg == "--output-dir") {
             if (i + 1 >= argc) { std::cerr << "--output-dir requires an argument\n"; return 1; }
             output_dir = argv[++i];
+            headless_mode = true;
         } else if (arg.substr(0, 2) == "--") {
             std::cerr << "Unknown option: " << arg << "\n";
             usage(argv[0]);
@@ -65,20 +75,36 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Ensure output directory exists
-    try {
-        fs::create_directories(output_dir);
-    } catch (const std::exception& e) {
-        std::cerr << "Cannot create output directory " << output_dir << ": " << e.what() << "\n";
-        return 1;
-    }
-
     // Load the .cadvis file
     CadvisFile data;
     try {
         data = read_cadvis(input_path);
     } catch (const std::exception& e) {
         std::cerr << "Error reading " << input_path << ": " << e.what() << "\n";
+        return 1;
+    }
+
+    // -----------------------------------------------------------------------
+    // GUI mode: open interactive ImGui viewer
+    // -----------------------------------------------------------------------
+    if (!headless_mode) {
+#ifdef CADVIS_GUI
+        run_app(data);
+        return 0;
+#else
+        std::cerr << "This build was compiled without GUI support.\n"
+                     "Use --all or --component to render SVG files.\n";
+        return 1;
+#endif
+    }
+
+    // -----------------------------------------------------------------------
+    // Headless mode: render SVG files (Phase 1 pipeline, unchanged)
+    // -----------------------------------------------------------------------
+    try {
+        fs::create_directories(output_dir);
+    } catch (const std::exception& e) {
+        std::cerr << "Cannot create output directory " << output_dir << ": " << e.what() << "\n";
         return 1;
     }
 
