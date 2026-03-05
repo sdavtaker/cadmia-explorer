@@ -37,6 +37,7 @@ add_test(NAME cadvis-test COMMAND cadvis-test)
 # ---------------------------------------------------------------------------
 if(BUILD_GUI)
     find_package(imgui CONFIG REQUIRED)
+    find_package(glfw3 CONFIG REQUIRED)
     find_package(OpenGL REQUIRED)
 
     add_executable(cadvis
@@ -47,7 +48,7 @@ if(BUILD_GUI)
         src/app.cpp
         src/renderer.cpp
     )
-    target_link_libraries(cadvis PRIVATE imgui::imgui OpenGL::GL)
+    target_link_libraries(cadvis PRIVATE imgui::imgui glfw OpenGL::GL)
     target_compile_definitions(cadvis PRIVATE CADVIS_GUI)
 else()
     # Headless-only build: no ImGui/GLFW/OpenGL needed

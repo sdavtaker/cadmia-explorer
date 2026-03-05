@@ -48,6 +48,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Bootstrap vcpkg if not pre-installed
+        run: |
+          if [ ! -f "${VCPKG_INSTALLATION_ROOT}/vcpkg" ]; then
+            VCPKG_INSTALLATION_ROOT="${GITHUB_WORKSPACE}/vcpkg"
+            echo "VCPKG_INSTALLATION_ROOT=${VCPKG_INSTALLATION_ROOT}" >> "${GITHUB_ENV}"
+            git clone --depth 1 https://github.com/microsoft/vcpkg.git "${VCPKG_INSTALLATION_ROOT}"
+            "${VCPKG_INSTALLATION_ROOT}/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+
       - name: Install build tools and GL/X11 headers
         run: |
           sudo apt-get update -q
