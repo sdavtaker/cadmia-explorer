@@ -14,7 +14,7 @@
 #include <vector>
 
 static constexpr float SIDEBAR_W = 230.0f;
-static constexpr const char* GLSL_VERSION = "#version 130";
+static constexpr const char* GLSL_VERSION = "#version 330";
 
 // ---------------------------------------------------------------------------
 // Helper: (re)initialise AppState for a given component index
