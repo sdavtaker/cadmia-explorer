@@ -21,7 +21,11 @@ static void usage(const char* argv0) {
         "Usage: " << argv0 << " [options] <file.cadvis>\n"
         "\n"
         "Modes:\n"
+#ifdef CADVIS_GUI
         "  No output flags     Open interactive viewer (Dear ImGui)\n"
+#else
+        "  No output flags     (GUI not available in this build; use --all/--component)\n"
+#endif
         "  --all               Render all components to SVG files (headless)\n"
         "  --component NAME    Render only component NAME to SVG (headless)\n"
         "\n"
