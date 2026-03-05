@@ -16,9 +16,9 @@ cadmia-explorer turns those logs into visual plots — one per component — sho
 - **Multiplicity**: when multiple branches produce the same event, a single rectangle with
   a count label (`×N`) represents them.
 
-## Quick Start (Phase 1: SVG Output)
+## Quick Start
 
-**Prerequisites**: Python 3.12+, pipenv, CMake 3.20+, a C++23 compiler.
+**Prerequisites**: Python 3.12+, pipenv, CMake 3.20+, a C++23 compiler, vcpkg.
 
 ```bash
 # 0. Set up the Python environment (first time only)
@@ -29,11 +29,39 @@ pipenv run python preprocess/preprocess.py \
     --log test_logs/4gp_log.jsonl \
     --output out.cadvis
 
-# 2. Build the C++ SVG renderer
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
+# 2. Build the C++ viewer
+export VCPKG_ROOT=/path/to/vcpkg   # or VCPKG_INSTALLATION_ROOT
+./scripts/build_cpp.sh
 
-# 3. Render SVG files (one per component)
+# 3a. Open the interactive viewer
+./build/cadvis out.cadvis
+
+# 3b. Or render static SVG files (headless, no display required)
+./build/cadvis --all --output-dir svgs/ out.cadvis
+```
+
+### Interactive Viewer Controls
+
+| Action | Control |
+|---|---|
+| Pan | Left-click drag |
+| Zoom | Scroll wheel (zooms toward cursor) |
+| Select rect | Left-click |
+| Highlight ancestor path | Automatic on click — ancestors brighten, others dim |
+| Cycle branch paths on a ×N rect | PgUp / PgDn |
+| Deselect | Click empty canvas |
+
+The **sidebar** shows:
+- Component selector dropdown
+- Selected rect details: time interval, output value, branch multiplicity
+- `(N / M)` path indicator and `PgUp/PgDn` hint when multiple ancestor paths exist
+
+### Building Without a Display (headless SVG only)
+
+If you have no X11/display headers (e.g. a headless server):
+
+```bash
+./scripts/build_cpp.sh -DBUILD_GUI=OFF
 ./build/cadvis --all --output-dir svgs/ out.cadvis
 ```
 
@@ -62,15 +90,15 @@ pipenv run python preprocess/preprocess.py \
 
 | Phase | Status | Description |
 |---|---|---|
-| 1 | In progress | Python preprocessor + C++ SVG renderer |
-| 2 | Planned | Interactive Dear ImGui viewer (desktop + WASM) |
+| 1 | Complete | Python preprocessor + C++ SVG renderer |
+| 2 | Complete | Interactive Dear ImGui desktop viewer |
 | 3 | Planned | WebGL2 instanced rendering for GB-scale logs |
 
 ## Project Layout
 
 ```
 preprocess/          Python preprocessor (JSONL → .cadvis binary)
-src/                 C++ renderer source
+src/                 C++ viewer source
 test_logs/           Small sample logs for development
 PLAN.md              Full implementation plan and design decisions
 reference.md         IA-DEVS theoretical background
