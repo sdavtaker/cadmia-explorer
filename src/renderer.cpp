@@ -211,17 +211,10 @@ static void draw_axes(ImDrawList *dl, const Component &comp, const Layout &layou
   for (double y : y_vals) {
     float py = vp.sy(layout.out_to_py(y));
     dl->AddLine({ay_x - 5.0f, py}, {ay_x, py}, axis_col, 1.0f);
-
-    // Find the label for this out_lo
-    const char *lbl = "";
-    for (const auto &r : comp.rects) {
-      if (r.out_lo == y) {
-        lbl = r.out_label.c_str();
-        break;
-      }
-    }
-    ImVec2 tsz = ImGui::CalcTextSize(lbl);
-    dl->AddText({ay_x - 8.0f - tsz.x, py - tsz.y * 0.5f}, text_col, lbl);
+    std::array<char, 32> buf;
+    std::snprintf(buf.data(), buf.size(), "%.3g", y);
+    ImVec2 tsz = ImGui::CalcTextSize(buf.data());
+    dl->AddText({ay_x - 8.0f - tsz.x, py - tsz.y * 0.5f}, text_col, buf.data());
   }
 }
 
