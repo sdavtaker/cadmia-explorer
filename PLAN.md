@@ -347,12 +347,37 @@ Same code compiled with Emscripten for web (GLFW replaced by emscripten browser 
 **Phase 2 additions to CMake**: detect `EMSCRIPTEN`, link `USE_WEBGL2=1 USE_GLFW=3`.
 
 
-## Phase 3: WebGL2 Scale Optimization
+## Phase 3a: Emscripten WASM Port
 
-For GB-scale logs with thousands of visible rects:
+Compiles the same C++ + Dear ImGui codebase to WebAssembly using Emscripten so the viewer
+runs in a browser with no installation.
+
+**Key decisions:**
+- imgui sourced via CMake FetchContent (pinned to v1.91.9) — avoids vcpkg Emscripten triplet complexity
+- GLFW provided by Emscripten's built-in stub (`-sUSE_GLFW=3`); GLFW API calls in app.cpp unchanged
+- File loading: ImGui "Open .cadvis..." button → `EM_ASM` triggers `<input type="file">` in `shell.html`
+  → JS writes bytes to MEMFS → `reload_file(path)` exported C function reloads state
+- Event loop: `run_frame()` extracted as a static function; desktop uses `while` loop, WASM uses
+  `emscripten_set_main_loop(run_frame, 0, 1)`
+- `AppState`/`Layout`/`CadvisFile`/`GLFWwindow*` lifted into global `AppContext g_ctx`
+
+**New files:** `shell.html`, `scripts/build_emscripten.sh`
+**Modified:** `CMakeLists.txt` (Emscripten platform branch), `src/main.cpp` (early WASM exit),
+`src/app.cpp` (AppContext global, run_frame, EMSCRIPTEN guards)
+
+**Build:**
+```bash
+source ~/emsdk/emsdk_env.sh
+./scripts/build_emscripten.sh
+python3 -m http.server 8080 --directory build-wasm
+```
+
+## Phase 3b: GPU Instanced Rendering (deferred)
+
+For GB-scale logs with tens of thousands of visible rects:
 - Raw OpenGL VAO/VBO with instanced rendering (`glDrawArraysInstanced`)
 - Viewport culling in vertex shader
-- This is the WebGL2 instanced rendering from the original prompt
+- Works identically on desktop (OpenGL 3.3) and WASM (WebGL2)
 
 
 ## Implementation Order

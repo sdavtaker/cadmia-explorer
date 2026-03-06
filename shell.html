@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>cadmia-explorer</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { width: 100%; height: 100%; overflow: hidden; background: #262626; }
+      #canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      #status {
+        position: fixed;
+        bottom: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: #aaa;
+        font: 13px/1.4 monospace;
+        pointer-events: none;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Hidden file picker; triggered by the ImGui "Open .cadvis..." button -->
+    <input id="cadvis-input" type="file" accept=".cadvis" style="display:none" />
+    <!-- Emscripten renders into this canvas (id must match Module.canvas below) -->
+    <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="status">Loading...</div>
+
+    <script>
+      var Module = {
+        canvas: document.getElementById('canvas'),
+
+        setStatus: function (text) {
+          var el = document.getElementById('status');
+          if (text) {
+            el.style.display = 'block';
+            el.textContent = text;
+          } else {
+            el.style.display = 'none';
+          }
+        },
+
+        monitorRunDependencies: function (left) {
+          if (left === 0) {
+            Module.setStatus('');
+          }
+        },
+
+        onRuntimeInitialized: function () {
+          // Wire up the file picker once the WASM runtime is ready
+          document.getElementById('cadvis-input').addEventListener('change', function (e) {
+            var f = e.target.files[0];
+            if (!f) { return; }
+            var reader = new FileReader();
+            reader.onload = function (ev) {
+              FS.writeFile('/upload.cadvis', new Uint8Array(ev.target.result));
+              Module.ccall('reload_file', 'void', ['string'], ['/upload.cadvis']);
+            };
+            reader.readAsArrayBuffer(f);
+            // Reset so the same file can be re-opened
+            e.target.value = '';
+          });
+        },
+      };
+
+      // Resize the canvas to fill the window
+      function resizeCanvas() {
+        var canvas = document.getElementById('canvas');
+        canvas.width  = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      window.addEventListener('resize', resizeCanvas);
+      resizeCanvas();
+
+      Module.setStatus('Loading…');
+      window.onerror = function (msg) {
+        Module.setStatus('Error: ' + msg);
+      };
+    </script>
+    {{{ SCRIPT }}}
+  </body>
+</html>

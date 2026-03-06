@@ -32,6 +32,7 @@ svgs/
 *.svg
 
 # Emscripten output
+build-wasm/
 *.wasm
 *.js.map
 
