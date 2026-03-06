@@ -121,8 +121,9 @@ static void draw_rect(ImDrawList *dl, const Rect &r, const Layout &layout, const
 // ---------------------------------------------------------------------------
 // Edge rendering
 // ---------------------------------------------------------------------------
-static void draw_edges(ImDrawList *dl, const Component &comp, const Layout &layout, const VP &vp) {
-  ImU32 edge_col = IM_COL32(136, 136, 136, 128);
+static void draw_edges(ImDrawList *dl, const Component &comp, const Layout &layout, const VP &vp,
+                       const AppState &state) {
+  bool anything_selected = (state.selected_rect >= 0);
 
   for (const auto &e : comp.edges) {
     if (e.from >= comp.rects.size() || e.to >= comp.rects.size()) {
@@ -130,6 +131,24 @@ static void draw_edges(ImDrawList *dl, const Component &comp, const Layout &layo
     }
     const Rect &fr = comp.rects[e.from];
     const Rect &tr = comp.rects[e.to];
+
+    // Determine if this edge lies on the highlighted ancestor path
+    bool on_path = anything_selected && e.from < state.is_ancestor.size() &&
+                   state.is_ancestor[e.from] && e.to < state.is_ancestor.size() &&
+                   state.is_ancestor[e.to];
+
+    ImU32 edge_col;
+    float thickness;
+    if (!anything_selected) {
+      edge_col = IM_COL32(136, 136, 136, 128);
+      thickness = 1.0f;
+    } else if (on_path) {
+      edge_col = IM_COL32(50, 90, 140, 230);
+      thickness = 2.0f;
+    } else {
+      edge_col = IM_COL32(136, 136, 136, 35);
+      thickness = 1.0f;
+    }
 
     // Source: center-right of source rect
     double fr_rx = layout.time_to_px(fr.time_lo) + layout.rect_pw(fr);
@@ -141,12 +160,11 @@ static void draw_edges(ImDrawList *dl, const Component &comp, const Layout &layo
 
     float dx = std::abs(tp.x - sp.x);
     if (dx < 10.0f) {
-      // Near-vertical: use bezier with horizontal offsets
       ImVec2 cp1 = {sp.x - 40.0f, sp.y};
       ImVec2 cp2 = {tp.x + 40.0f, tp.y};
-      dl->AddBezierCubic(sp, cp1, cp2, tp, edge_col, 1.0f);
+      dl->AddBezierCubic(sp, cp1, cp2, tp, edge_col, thickness);
     } else {
-      dl->AddLine(sp, tp, edge_col, 1.0f);
+      dl->AddLine(sp, tp, edge_col, thickness);
     }
     arrow_tip(dl, tp, sp, edge_col);
   }
@@ -193,17 +211,10 @@ static void draw_axes(ImDrawList *dl, const Component &comp, const Layout &layou
   for (double y : y_vals) {
     float py = vp.sy(layout.out_to_py(y));
     dl->AddLine({ay_x - 5.0f, py}, {ay_x, py}, axis_col, 1.0f);
-
-    // Find the label for this out_lo
-    const char *lbl = "";
-    for (const auto &r : comp.rects) {
-      if (r.out_lo == y) {
-        lbl = r.out_label.c_str();
-        break;
-      }
-    }
-    ImVec2 tsz = ImGui::CalcTextSize(lbl);
-    dl->AddText({ay_x - 8.0f - tsz.x, py - tsz.y * 0.5f}, text_col, lbl);
+    std::array<char, 32> buf;
+    std::snprintf(buf.data(), buf.size(), "%.3g", y);
+    ImVec2 tsz = ImGui::CalcTextSize(buf.data());
+    dl->AddText({ay_x - 8.0f - tsz.x, py - tsz.y * 0.5f}, text_col, buf.data());
   }
 }
 
@@ -218,7 +229,7 @@ void render_component(ImDrawList *dl, const Component &comp, const Layout &layou
   bool anything_selected = (state.selected_rect >= 0);
 
   // Edges first (lower z-order)
-  draw_edges(dl, comp, layout, vp);
+  draw_edges(dl, comp, layout, vp, state);
 
   // Rects
   for (int i = 0; i < static_cast<int>(comp.rects.size()); ++i) {
