@@ -26,7 +26,7 @@ struct VP {
 // ---------------------------------------------------------------------------
 // Drawing helpers
 // ---------------------------------------------------------------------------
-static void dashed_line(const ImDrawList *dl, ImVec2 p0, ImVec2 p1, ImU32 col, float thick,
+static void dashed_line(ImDrawList *dl, ImVec2 p0, ImVec2 p1, ImU32 col, float thick,
                         float dash_len = 4.0f, float gap_len = 3.0f) {
   float dx = p1.x - p0.x;
   float dy = p1.y - p0.y;
@@ -53,8 +53,7 @@ static void dashed_line(const ImDrawList *dl, ImVec2 p0, ImVec2 p1, ImU32 col, f
   }
 }
 
-static void arrow_tip(const ImDrawList *dl, ImVec2 tip, ImVec2 from_pt, ImU32 col,
-                      float size = 7.0f) {
+static void arrow_tip(ImDrawList *dl, ImVec2 tip, ImVec2 from_pt, ImU32 col, float size = 7.0f) {
   float dx = tip.x - from_pt.x;
   float dy = tip.y - from_pt.y;
   float len = std::sqrt(dx * dx + dy * dy);
@@ -74,7 +73,7 @@ static void arrow_tip(const ImDrawList *dl, ImVec2 tip, ImVec2 from_pt, ImU32 co
 // ---------------------------------------------------------------------------
 // Rect rendering
 // ---------------------------------------------------------------------------
-static void draw_rect(const ImDrawList *dl, const Rect &r, const Layout &layout, const VP &vp,
+static void draw_rect(ImDrawList *dl, const Rect &r, const Layout &layout, const VP &vp,
                       ImU32 fill_col, ImU32 border_col) {
   float x1 = vp.sx(layout.time_to_px(r.time_lo));
   float x2 = vp.sx(layout.time_to_px(r.time_lo) + layout.rect_pw(r));
@@ -155,8 +154,7 @@ static void draw_edges(ImDrawList *dl, const Component &comp, const Layout &layo
 // ---------------------------------------------------------------------------
 // Axis rendering
 // ---------------------------------------------------------------------------
-static void draw_axes(const ImDrawList *dl, const Component &comp, const Layout &layout,
-                      const VP &vp) {
+static void draw_axes(ImDrawList *dl, const Component &comp, const Layout &layout, const VP &vp) {
   ImU32 axis_col = IM_COL32(60, 60, 60, 220);
   ImU32 text_col = IM_COL32(40, 40, 40, 220);
 

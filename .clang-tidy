@@ -5,6 +5,7 @@ Checks: >
   readability-*,
   -bugprone-easily-swappable-parameters,
   -modernize-use-trailing-return-type,
+  -readability-non-const-parameter,
   -modernize-use-std-print,
   -readability-function-cognitive-complexity,
   -readability-identifier-length,
