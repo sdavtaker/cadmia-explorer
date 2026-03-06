@@ -4,6 +4,7 @@ Checks: >
   performance-*,
   readability-*,
   -bugprone-easily-swappable-parameters,
+  -clang-analyzer-valist.Uninitialized,
   -modernize-use-trailing-return-type,
   -readability-non-const-parameter,
   -modernize-use-std-print,

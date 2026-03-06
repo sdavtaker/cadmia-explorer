@@ -125,8 +125,9 @@ static void draw_edges(ImDrawList *dl, const Component &comp, const Layout &layo
   ImU32 edge_col = IM_COL32(136, 136, 136, 128);
 
   for (const auto &e : comp.edges) {
-    if (e.from >= comp.rects.size() || e.to >= comp.rects.size())
+    if (e.from >= comp.rects.size() || e.to >= comp.rects.size()) {
       continue;
+    }
     const Rect &fr = comp.rects[e.from];
     const Rect &tr = comp.rects[e.to];
 
@@ -185,8 +186,9 @@ static void draw_axes(ImDrawList *dl, const Component &comp, const Layout &layou
 
   // Y ticks: one per unique out_lo value
   std::set<double> y_vals;
-  for (const auto &r : comp.rects)
+  for (const auto &r : comp.rects) {
     y_vals.insert(r.out_lo);
+  }
 
   for (double y : y_vals) {
     float py = vp.sy(layout.out_to_py(y));
@@ -222,7 +224,8 @@ void render_component(ImDrawList *dl, const Component &comp, const Layout &layou
   for (int i = 0; i < static_cast<int>(comp.rects.size()); ++i) {
     const Rect &r = comp.rects[static_cast<size_t>(i)];
 
-    ImU32 fill_col, border_col;
+    ImU32 fill_col;
+    ImU32 border_col;
     if (!anything_selected) {
       fill_col = IM_COL32(70, 130, 180, 100);
       border_col = IM_COL32(50, 90, 140, 220);
