@@ -12,7 +12,7 @@ jobs:
   # -------------------------------------------------------------------------
   python:
     name: Python lint & tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     env:
       PIPENV_PYTHON: python
 
@@ -40,7 +40,7 @@ jobs:
   # -------------------------------------------------------------------------
   cpp:
     name: C++ build & tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     env:
       PIPENV_PYTHON: python
       VCPKG_INSTALLATION_ROOT: /usr/local/share/vcpkg
@@ -63,11 +63,8 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y cmake g++ libgl1-mesa-dev \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev \
-            libxi-dev libxext-dev
-          # Install clang-18 for clang-format and clang-tidy (needs C++23 support)
-          wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
-          sudo bash /tmp/llvm.sh 18
-          sudo apt-get install -y clang-format-18 clang-tidy-18
+            libxi-dev libxext-dev \
+            clang-format-18 clang-tidy-18
           sudo ln -sf /usr/bin/clang-format-18 /usr/local/bin/clang-format
           sudo ln -sf /usr/bin/clang-tidy-18 /usr/local/bin/clang-tidy
 
