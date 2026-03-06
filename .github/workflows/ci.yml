@@ -44,6 +44,7 @@ jobs:
     env:
       PIPENV_PYTHON: python
       VCPKG_INSTALLATION_ROOT: /usr/local/share/vcpkg
+      VCPKG_FORCE_SYSTEM_BINARIES: "1"
 
     steps:
       - uses: actions/checkout@v4

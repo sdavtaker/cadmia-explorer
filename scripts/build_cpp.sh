@@ -13,6 +13,10 @@ if [[ ! -f "$VCPKG_TC" ]]; then
     exit 1
 fi
 
+# Use system cmake/ninja rather than letting vcpkg download its own copies.
+# Prevents "Host path separator" errors on Linux and speeds up first-time builds.
+export VCPKG_FORCE_SYSTEM_BINARIES=1
+
 # Extra cmake args passed through (e.g. -DBUILD_GUI=OFF for headless-only builds)
 EXTRA_ARGS=("$@")
 
