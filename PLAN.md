@@ -393,3 +393,21 @@ For GB-scale logs with thousands of visible rects:
 | Open/closed intervals | Per-side dashed/solid border | Encodes the mathematical interval meaning |
 | Edge routing | Straight lines / beziers, low opacity | Sufficient for Phase 1 |
 | Technology stack | C++23 + Emscripten | Single codebase for desktop and web |
+
+---
+
+## Known Non-Issues
+
+These have been raised by automated reviewers and investigated; no action is needed.
+
+### OpenGL function loader (`src/app.cpp`)
+
+The vcpkg `imgui` port with the `opengl3-binding` feature bundles its own GL function loader
+(`imgui_impl_opengl3_loader.h`), which is initialized automatically by `ImGui_ImplOpenGL3_Init`.
+No separate glad/gl3w dependency is required. Adding one would be redundant.
+
+### Y-axis label lookup is O(U×N) (`src/renderer.cpp`)
+
+The axis renderer does a linear scan over `comp.rects` for each unique `out_lo` value to find
+its label string. In practice N is at most a few dozen rects per component, so this is
+negligible. The added complexity of a pre-built map would not be justified.

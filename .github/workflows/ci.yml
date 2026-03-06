@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["main", "phase-1-visualization"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
 
@@ -12,7 +12,7 @@ jobs:
   # -------------------------------------------------------------------------
   python:
     name: Python lint & tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     env:
       PIPENV_PYTHON: python
 
@@ -36,24 +36,46 @@ jobs:
         run: ./scripts/test_python.sh
 
   # -------------------------------------------------------------------------
-  # C++: build + end-to-end tests
+  # C++: build + unit tests + end-to-end tests
   # -------------------------------------------------------------------------
   cpp:
-    name: C++ build & e2e tests
-    runs-on: ubuntu-22.04
+    name: C++ build & tests
+    runs-on: ubuntu-24.04
     env:
       PIPENV_PYTHON: python
+      VCPKG_INSTALLATION_ROOT: /usr/local/share/vcpkg
+      VCPKG_FORCE_SYSTEM_BINARIES: "1"
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build tools
+      - name: Bootstrap vcpkg if not pre-installed
+        run: |
+          if [ ! -f "${VCPKG_INSTALLATION_ROOT}/vcpkg" ]; then
+            VCPKG_INSTALLATION_ROOT="${GITHUB_WORKSPACE}/vcpkg"
+            echo "VCPKG_INSTALLATION_ROOT=${VCPKG_INSTALLATION_ROOT}" >> "${GITHUB_ENV}"
+            git clone --depth 1 https://github.com/microsoft/vcpkg.git "${VCPKG_INSTALLATION_ROOT}"
+            "${VCPKG_INSTALLATION_ROOT}/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+
+      - name: Install build tools, GL/X11 headers, and clang-18 lint tools
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y cmake g++
+          sudo apt-get install -y cmake g++ libgl1-mesa-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev \
+            libxi-dev libxext-dev \
+            clang-format-18 clang-tidy-18
+          sudo ln -sf /usr/bin/clang-format-18 /usr/local/bin/clang-format
+          sudo ln -sf /usr/bin/clang-tidy-18 /usr/local/bin/clang-tidy
 
       - name: Build cadvis
         run: ./scripts/build_cpp.sh
+
+      - name: C++ lint (clang-format + clang-tidy)
+        run: ./scripts/lint_cpp.sh
+
+      - name: C++ unit tests
+        run: ./scripts/test_cpp.sh
 
       - uses: actions/setup-python@v5
         with:
