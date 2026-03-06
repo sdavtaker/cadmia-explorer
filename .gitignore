@@ -84,3 +84,6 @@ svgs/
 # debug information files
 *.dwo
 prompt.md
+
+# Large local test logs (not committed)
+counter_log.jsonl
