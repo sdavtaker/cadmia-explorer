@@ -58,13 +58,18 @@ jobs:
             "${VCPKG_INSTALLATION_ROOT}/bootstrap-vcpkg.sh" -disableMetrics
           fi
 
-      - name: Install build tools and GL/X11 headers
+      - name: Install build tools, GL/X11 headers, and clang-18 lint tools
         run: |
           sudo apt-get update -q
           sudo apt-get install -y cmake g++ libgl1-mesa-dev \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev \
-            libxi-dev libxext-dev \
-            clang-format clang-tidy
+            libxi-dev libxext-dev
+          # Install clang-18 for clang-format and clang-tidy (needs C++23 support)
+          wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          sudo bash /tmp/llvm.sh 18
+          sudo apt-get install -y clang-format-18 clang-tidy-18
+          sudo ln -sf /usr/bin/clang-format-18 /usr/local/bin/clang-format
+          sudo ln -sf /usr/bin/clang-tidy-18 /usr/local/bin/clang-tidy
 
       - name: Build cadvis
         run: ./scripts/build_cpp.sh

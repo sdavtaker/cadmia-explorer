@@ -55,8 +55,9 @@ static void render_sidebar(AppState &state, const CadvisFile &file, bool &comp_c
           comp_changed = true;
         }
       }
-      if (selected)
+      if (selected) {
         ImGui::SetItemDefaultFocus();
+      }
     }
     ImGui::EndCombo();
   }
@@ -226,7 +227,7 @@ void run_app(const CadvisFile &file) {
   // ------------------------------------------------------------------
   glfwSetErrorCallback(
       [](int err, const char *desc) { std::fprintf(stderr, "GLFW error %d: %s\n", err, desc); });
-  if (!glfwInit()) {
+  if (glfwInit() == GLFW_FALSE) {
     std::fprintf(stderr, "Failed to initialise GLFW\n");
     return;
   }
@@ -239,7 +240,7 @@ void run_app(const CadvisFile &file) {
 #endif
 
   GLFWwindow *window = glfwCreateWindow(1280, 800, "cadmia-explorer", nullptr, nullptr);
-  if (!window) {
+  if (window == nullptr) {
     std::fprintf(stderr, "Failed to create GLFW window\n");
     glfwTerminate();
     return;
@@ -270,7 +271,7 @@ void run_app(const CadvisFile &file) {
   // ------------------------------------------------------------------
   // Main loop
   // ------------------------------------------------------------------
-  while (!glfwWindowShouldClose(window)) {
+  while (glfwWindowShouldClose(window) == GLFW_FALSE) {
     glfwPollEvents();
 
     // Rebuild state / layout when component changes
