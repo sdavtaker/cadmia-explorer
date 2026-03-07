@@ -29,7 +29,7 @@ struct GpuRectRenderer {
   unsigned int vao = 0;       ///< VAO with per-instance attribs
   unsigned int vbo = 0;       ///< Instance buffer (RectInstance[])
   unsigned int prog = 0;      ///< Linked shader program
-  unsigned int state_tex = 0; ///< GL_TEXTURE_2D, 1×N, GL_R8UI
+  unsigned int state_tex = 0; ///< GL_TEXTURE_2D, N×1, GL_R8UI
                               ///< 0=dim 1=normal 2=ancestor 3=selected
   int n_instances = 0;
 

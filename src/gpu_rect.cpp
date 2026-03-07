@@ -29,11 +29,11 @@
 static constexpr const char *VERT_PREAMBLE = "#version 300 es\n"
                                              "precision highp float;\n"
                                              "precision highp int;\n"
-                                             "precision highp isampler2D;\n";
+                                             "precision highp usampler2D;\n";
 static constexpr const char *FRAG_PREAMBLE = "#version 300 es\n"
                                              "precision highp float;\n"
                                              "precision highp int;\n"
-                                             "precision highp isampler2D;\n";
+                                             "precision highp usampler2D;\n";
 #else
 static constexpr const char *VERT_PREAMBLE = "#version 330 core\n";
 static constexpr const char *FRAG_PREAMBLE = "#version 330 core\n";
@@ -64,7 +64,7 @@ uniform vec2 u_x_transform;     // (A_x, B_x)
 uniform vec2 u_y_transform;     // (A_y, B_y)  — A_y negative (Y inverted)
 uniform vec4 u_clip_rect;       // (x1,y1,x2,y2) screen px — canvas clip rect
 uniform vec2 u_display_size;    // (fb_w, fb_h) for NDC conversion
-uniform isampler2D u_state_tex; // 1 x N_RECTS, GL_R8UI
+uniform usampler2D u_state_tex; // N_RECTS x 1, GL_R8UI
 
 out vec2      v_uv;       // [0,1]^2 in rect
 out vec2      v_rect_size;
@@ -518,8 +518,6 @@ void GpuRectRenderer::draw(ImDrawList *dl, ImVec2 canvas_pos, ImVec2 canvas_size
   dl->AddCallback(gpu_rect_callback, payload);
   // Reset ImGui's render state after raw GL draw
   dl->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
-
-  (void)state; // state used only for upload_state(); transform uses layout
 }
 
 #endif // CADVIS_GUI
