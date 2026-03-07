@@ -2,10 +2,16 @@
 
 #include "gpu_rect.h"
 
-// ImGui's bundled glad2 loader provides extern declarations for GL 3.x
-// function pointers. They are defined (and initialized) in
-// imgui_impl_opengl3.cpp when ImGui_ImplOpenGL3_Init() is called.
-#include "imgui_impl_opengl3_loader.h"
+// On Emscripten (WebGL2) the GLES3 header provides all entry points directly.
+// On desktop Linux/Mac, <GL/glext.h> with GL_GLEXT_PROTOTYPES declares every
+// GL 3.x core function; Mesa/libGL exports them from the linked libGL.so.
+#ifdef __EMSCRIPTEN__
+#include <GLES3/gl3.h>
+#else
+#define GL_GLEXT_PROTOTYPES
+#include <GL/gl.h>
+#include <GL/glext.h>
+#endif
 
 #include <algorithm>
 #include <cstdio>
