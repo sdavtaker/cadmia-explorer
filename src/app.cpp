@@ -259,8 +259,10 @@ static void run_frame() {
   if (g_ctx.state.cur_comp != g_ctx.layout_comp) {
     if (!g_ctx.file.components.empty()) {
       reset_component(g_ctx.state, g_ctx.file, g_ctx.state.cur_comp);
-      Layout::from_component(g_ctx.file.components[static_cast<size_t>(g_ctx.state.cur_comp)],
-                             g_ctx.layout);
+      if (!Layout::from_component(g_ctx.file.components[static_cast<size_t>(g_ctx.state.cur_comp)],
+                                  g_ctx.layout)) {
+        g_ctx.layout = Layout{};
+      }
     }
     g_ctx.layout_comp = g_ctx.state.cur_comp;
   }
@@ -282,8 +284,10 @@ static void run_frame() {
   render_sidebar(g_ctx.state, g_ctx.file, comp_changed);
   if (comp_changed && !g_ctx.file.components.empty()) {
     reset_component(g_ctx.state, g_ctx.file, g_ctx.state.cur_comp);
-    Layout::from_component(g_ctx.file.components[static_cast<size_t>(g_ctx.state.cur_comp)],
-                           g_ctx.layout);
+    if (!Layout::from_component(g_ctx.file.components[static_cast<size_t>(g_ctx.state.cur_comp)],
+                                g_ctx.layout)) {
+      g_ctx.layout = Layout{};
+    }
     g_ctx.layout_comp = g_ctx.state.cur_comp;
   }
   ImGui::EndChild();
@@ -319,7 +323,11 @@ static void run_frame() {
 extern "C" EMSCRIPTEN_KEEPALIVE void reload_file(const char *path) {
   try {
     g_ctx.file = read_cadvis(path);
+  } catch (const std::exception &e) {
+    std::fprintf(stderr, "Failed to load '%s': %s\n", path, e.what());
+    return;
   } catch (...) {
+    std::fprintf(stderr, "Failed to load '%s': unknown error\n", path);
     return;
   }
   if (!g_ctx.file.components.empty()) {

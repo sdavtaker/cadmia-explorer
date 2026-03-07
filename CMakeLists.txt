@@ -79,8 +79,8 @@ if(BUILD_GUI)
             -sMAX_WEBGL_VERSION=2
             -sFORCE_FILESYSTEM=1
             -sALLOW_MEMORY_GROWTH=1
-            "-sEXPORTED_RUNTIME_METHODS=ccall,FS"
-            "-sEXPORTED_FUNCTIONS=_main,_reload_file"
+            "-sEXPORTED_RUNTIME_METHODS=['ccall','FS']"
+            "-sEXPORTED_FUNCTIONS=['_main','_reload_file']"
             --shell-file ${CMAKE_SOURCE_DIR}/shell.html
         )
     else()
