@@ -65,6 +65,20 @@
             // Reset so the same file can be re-opened
             e.target.value = '';
           });
+
+          // Prevent the browser from consuming scroll events before Emscripten's
+          // GLFW handler sees them (browsers default wheel listeners to passive).
+          document.getElementById('canvas').addEventListener('wheel', function (e) {
+            e.preventDefault();
+          }, { passive: false });
+
+          // Prevent the browser from using PgUp/PgDn for page scrolling so that
+          // ImGui's branch-path cycling (IsKeyPressed PageUp/PageDown) works.
+          window.addEventListener('keydown', function (e) {
+            if (e.key === 'PageUp' || e.key === 'PageDown') {
+              e.preventDefault();
+            }
+          });
         },
       };
 
