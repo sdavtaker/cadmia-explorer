@@ -47,7 +47,8 @@ static void reset_component(AppState &state, const CadvisFile &file, int idx) {
   state.cur_comp = idx;
   state.pan_x = 0.0f;
   state.pan_y = 0.0f;
-  state.zoom = 1.0f;
+  state.zoom_x = 1.0f;
+  state.zoom_y = 1.0f;
   state.selected_rect = -1;
   state.selected_sub = 0;
   state.selected_sub_count = 0;
@@ -103,6 +104,21 @@ static void render_sidebar(AppState &state, const CadvisFile &file, bool &comp_c
   const Component &comp = file.components[static_cast<size_t>(state.cur_comp)];
   ImGui::Text("%d rect(s), %d edge(s)", static_cast<int>(comp.rects.size()),
               static_cast<int>(comp.edges.size()));
+
+  ImGui::Separator();
+  ImGui::TextUnformatted("Zoom:");
+  ImGui::SetNextItemWidth(-1.0f);
+  ImGui::SliderFloat("##zoom_x", &state.zoom_x, 0.05f, 40.0f, "H: %.2fx",
+                     ImGuiSliderFlags_Logarithmic);
+  ImGui::SetNextItemWidth(-1.0f);
+  ImGui::SliderFloat("##zoom_y", &state.zoom_y, 0.05f, 40.0f, "V: %.2fx",
+                     ImGuiSliderFlags_Logarithmic);
+  if (ImGui::Button("Reset view")) {
+    state.zoom_x = 1.0f;
+    state.zoom_y = 1.0f;
+    state.pan_x = 0.0f;
+    state.pan_y = 0.0f;
+  }
 
   if (state.selected_rect < 0) {
     ImGui::Separator();
@@ -206,8 +222,8 @@ static void render_canvas(AppState &state, const CadvisFile &file, Layout &layou
     if (!s_dragged) {
       // Click: hit test
       int hit = find_rect_under_cursor(comp, layout, canvas_pos.x, canvas_pos.y, canvas_size.x,
-                                       canvas_size.y, state.pan_x, state.pan_y, state.zoom,
-                                       io.MousePos.x, io.MousePos.y);
+                                       canvas_size.y, state.pan_x, state.pan_y, state.zoom_x,
+                                       state.zoom_y, io.MousePos.x, io.MousePos.y);
 
       state.selected_rect = hit;
       if (hit >= 0) {
@@ -224,15 +240,16 @@ static void render_canvas(AppState &state, const CadvisFile &file, Layout &layou
     s_dragged = false;
   }
 
-  // Zoom: scroll wheel (zoom around cursor)
+  // Zoom: scroll wheel (uniform zoom around cursor)
   if (is_hovered && io.MouseWheel != 0.0f) {
     float factor = (io.MouseWheel > 0.0f) ? 1.1f : (1.0f / 1.1f);
     // Keep the point under the cursor fixed
-    float lx = (io.MousePos.x - canvas_pos.x - state.pan_x) / state.zoom;
-    float ly = (io.MousePos.y - canvas_pos.y - state.pan_y) / state.zoom;
-    state.zoom = std::clamp(state.zoom * factor, 0.05f, 40.0f);
-    state.pan_x = io.MousePos.x - canvas_pos.x - lx * state.zoom;
-    state.pan_y = io.MousePos.y - canvas_pos.y - ly * state.zoom;
+    float lx = (io.MousePos.x - canvas_pos.x - state.pan_x) / state.zoom_x;
+    float ly = (io.MousePos.y - canvas_pos.y - state.pan_y) / state.zoom_y;
+    state.zoom_x = std::clamp(state.zoom_x * factor, 0.05f, 40.0f);
+    state.zoom_y = std::clamp(state.zoom_y * factor, 0.05f, 40.0f);
+    state.pan_x = io.MousePos.x - canvas_pos.x - lx * state.zoom_x;
+    state.pan_y = io.MousePos.y - canvas_pos.y - ly * state.zoom_y;
   }
 
   // PgUp / PgDn: cycle branch paths for selected multiplicity rect

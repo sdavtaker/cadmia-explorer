@@ -73,20 +73,20 @@ inline std::vector<bool> compute_ancestors(const Component &comp,
 /// box contains the cursor at (mx, my).  Returns -1 if none.
 ///
 /// Coordinate transform (layout → screen):
-///   screen_x = canvas_ox + (layout_px / CANVAS_W * canvas_w) * zoom + pan_x
-///   screen_y = canvas_oy + (layout_py / CANVAS_H * canvas_h) * zoom + pan_y
+///   screen_x = canvas_ox + (layout_px / CANVAS_W * canvas_w) * zoom_x + pan_x
+///   screen_y = canvas_oy + (layout_py / CANVAS_H * canvas_h) * zoom_y + pan_y
 ///
 /// All parameters are plain floats — no ImGui types.
 inline int find_rect_under_cursor(const Component &comp, const Layout &layout, float canvas_ox,
                                   float canvas_oy, float canvas_w, float canvas_h, float pan_x,
-                                  float pan_y, float zoom, float mx, float my) {
-  if (canvas_w <= 0.0f || canvas_h <= 0.0f || zoom <= 0.0f) {
+                                  float pan_y, float zoom_x, float zoom_y, float mx, float my) {
+  if (canvas_w <= 0.0f || canvas_h <= 0.0f || zoom_x <= 0.0f || zoom_y <= 0.0f) {
     return -1;
   }
 
   // Inverse transform: screen → layout coordinates
-  float lx = (mx - canvas_ox - pan_x) / zoom * static_cast<float>(Layout::CANVAS_W) / canvas_w;
-  float ly = (my - canvas_oy - pan_y) / zoom * static_cast<float>(Layout::CANVAS_H) / canvas_h;
+  float lx = (mx - canvas_ox - pan_x) / zoom_x * static_cast<float>(Layout::CANVAS_W) / canvas_w;
+  float ly = (my - canvas_oy - pan_y) / zoom_y * static_cast<float>(Layout::CANVAS_H) / canvas_h;
 
   int hit = -1;
   for (int i = 0; i < static_cast<int>(comp.rects.size()); ++i) {

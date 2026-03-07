@@ -162,7 +162,7 @@ TEST_CASE("find_rect_under_cursor: no rects") {
   Component c;
   Layout layout{};
   int hit = find_rect_under_cursor(c, layout, 0.0f, 0.0f, (float)Layout::CANVAS_W,
-                                   (float)Layout::CANVAS_H, 0.0f, 0.0f, 1.0f, 100.0f, 100.0f);
+                                   (float)Layout::CANVAS_H, 0.0f, 0.0f, 1.0f, 1.0f, 100.0f, 100.0f);
   REQUIRE(hit == -1);
 }
 
@@ -177,7 +177,7 @@ TEST_CASE("find_rect_under_cursor: click inside single rect") {
 
   int hit =
       find_rect_under_cursor(c, layout, 0.0f, 0.0f, (float)Layout::CANVAS_W,
-                             (float)Layout::CANVAS_H, 0.0f, 0.0f, 1.0f, (float)cx_l, (float)cy_l);
+                             (float)Layout::CANVAS_H, 0.0f, 0.0f, 1.0f, 1.0f, (float)cx_l, (float)cy_l);
   REQUIRE(hit == 0);
 }
 
@@ -188,7 +188,7 @@ TEST_CASE("find_rect_under_cursor: click outside all rects") {
 
   // Axis margin area (left of plot)
   int hit = find_rect_under_cursor(c, layout, 0.0f, 0.0f, (float)Layout::CANVAS_W,
-                                   (float)Layout::CANVAS_H, 0.0f, 0.0f, 1.0f, 2.0f,
+                                   (float)Layout::CANVAS_H, 0.0f, 0.0f, 1.0f, 1.0f, 2.0f,
                                    450.0f); // deep in left margin
   REQUIRE(hit == -1);
 }
@@ -204,7 +204,7 @@ TEST_CASE("find_rect_under_cursor: last overlapping rect wins") {
 
   int hit =
       find_rect_under_cursor(c, layout, 0.0f, 0.0f, (float)Layout::CANVAS_W,
-                             (float)Layout::CANVAS_H, 0.0f, 0.0f, 1.0f, (float)cx_l, (float)cy_l);
+                             (float)Layout::CANVAS_H, 0.0f, 0.0f, 1.0f, 1.0f, (float)cx_l, (float)cy_l);
   REQUIRE(hit == 1); // higher index wins
 }
 
@@ -220,8 +220,8 @@ TEST_CASE("find_rect_under_cursor: pan offsets cursor correctly") {
   float pan_y = 30.0f;
   // With pan, screen position of rect centre is cx_l + pan_x, cy_l + pan_y
   int hit = find_rect_under_cursor(c, layout, 0.0f, 0.0f, (float)Layout::CANVAS_W,
-                                   (float)Layout::CANVAS_H, pan_x, pan_y, 1.0f, (float)cx_l + pan_x,
-                                   (float)cy_l + pan_y);
+                                   (float)Layout::CANVAS_H, pan_x, pan_y, 1.0f, 1.0f,
+                                   (float)cx_l + pan_x, (float)cy_l + pan_y);
   REQUIRE(hit == 0);
 }
 
@@ -236,8 +236,8 @@ TEST_CASE("find_rect_under_cursor: zoom scales position") {
   float zoom = 2.0f;
   // Screen position of rect centre at zoom=2: cx_l * zoom, cy_l * zoom
   int hit = find_rect_under_cursor(c, layout, 0.0f, 0.0f, (float)Layout::CANVAS_W,
-                                   (float)Layout::CANVAS_H, 0.0f, 0.0f, zoom, (float)cx_l * zoom,
-                                   (float)cy_l * zoom);
+                                   (float)Layout::CANVAS_H, 0.0f, 0.0f, zoom, zoom,
+                                   (float)cx_l * zoom, (float)cy_l * zoom);
   REQUIRE(hit == 0);
 }
 
@@ -296,8 +296,8 @@ TEST_CASE("Layout adds 5% time padding and 10% output padding") {
   c.rects = {make_rect(0.0, 10.0, 0.0, 10.0)};
   Layout layout{};
   REQUIRE(Layout::from_component(c, layout));
-  // 5% of span=10 = 0.5 padding each side
-  REQUIRE(layout.t_min == Approx(-0.5).epsilon(1e-9));
+  // X axis always starts at 0; 5% right-side padding: 10 + 0.5 = 10.5
+  REQUIRE(layout.t_min == Approx(0.0).epsilon(1e-9));
   REQUIRE(layout.t_max == Approx(10.5).epsilon(1e-9));
   // 10% of span=10 = 1.0 padding each side
   REQUIRE(layout.y_min == Approx(-1.0).epsilon(1e-9));
