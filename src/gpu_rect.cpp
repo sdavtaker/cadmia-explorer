@@ -2,7 +2,11 @@
 
 #include "gpu_rect.h"
 
-#include <GLFW/glfw3.h>
+// ImGui's bundled glad2 loader provides extern declarations for GL 3.x
+// function pointers. They are defined (and initialized) in
+// imgui_impl_opengl3.cpp when ImGui_ImplOpenGL3_Init() is called.
+#include "imgui_impl_opengl3_loader.h"
+
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
