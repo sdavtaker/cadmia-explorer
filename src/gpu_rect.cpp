@@ -169,6 +169,13 @@ void main() {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+// Convert a byte offset (from offsetof) to the const void* required by
+// glVertexAttribPointer/IPointer. The NOLINT is intentional: this integer→
+// pointer cast is the only portable way to specify VBO offsets.
+// NOLINTNEXTLINE(performance-no-int-to-ptr)
+static const void *vbo_offset(std::size_t off) { return reinterpret_cast<const void *>(off); }
+
 static unsigned int compile_shader(GLenum type, const char *preamble, const char *body) {
   unsigned int shader = glCreateShader(type);
   std::array<const char *, 2> srcs = {preamble, body};
@@ -226,36 +233,31 @@ void GpuRectRenderer::init() {
   // loc 0: time_lo (float)
   glEnableVertexAttribArray(0);
   glVertexAttribPointer(0, 1, GL_FLOAT, GL_FALSE, sizeof(RectInstance),
-                        reinterpret_cast<const void *>(
-                            offsetof(RectInstance, time_lo))); // NOLINT(performance-no-int-to-ptr)
+                        vbo_offset(offsetof(RectInstance, time_lo)));
   glVertexAttribDivisor(0, 1);
 
   // loc 1: time_hi (float)
   glEnableVertexAttribArray(1);
   glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, sizeof(RectInstance),
-                        reinterpret_cast<const void *>(
-                            offsetof(RectInstance, time_hi))); // NOLINT(performance-no-int-to-ptr)
+                        vbo_offset(offsetof(RectInstance, time_hi)));
   glVertexAttribDivisor(1, 1);
 
   // loc 2: out_lo (float)
   glEnableVertexAttribArray(2);
   glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(RectInstance),
-                        reinterpret_cast<const void *>(
-                            offsetof(RectInstance, out_lo))); // NOLINT(performance-no-int-to-ptr)
+                        vbo_offset(offsetof(RectInstance, out_lo)));
   glVertexAttribDivisor(2, 1);
 
   // loc 3: out_hi (float)
   glEnableVertexAttribArray(3);
   glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(RectInstance),
-                        reinterpret_cast<const void *>(
-                            offsetof(RectInstance, out_hi))); // NOLINT(performance-no-int-to-ptr)
+                        vbo_offset(offsetof(RectInstance, out_hi)));
   glVertexAttribDivisor(3, 1);
 
   // loc 4: flags (uint) — must use IPointer to preserve integer bits
   glEnableVertexAttribArray(4);
   glVertexAttribIPointer(4, 1, GL_UNSIGNED_INT, sizeof(RectInstance),
-                         reinterpret_cast<const void *>(
-                             offsetof(RectInstance, flags))); // NOLINT(performance-no-int-to-ptr)
+                         vbo_offset(offsetof(RectInstance, flags)));
   glVertexAttribDivisor(4, 1);
 
   glBindVertexArray(0);
