@@ -19,9 +19,13 @@ emcmake cmake -B build-wasm \
 
 cmake --build build-wasm --parallel
 
+# Copy shell.html into the build directory as index.html so it can be served
+# alongside the generated cadvis.js / cadvis.wasm.
+cp shell.html build-wasm/index.html
+
 echo ""
-echo "Build complete: build-wasm/cadvis.html"
+echo "Build complete: build-wasm/cadvis.js + cadvis.wasm"
 echo ""
 echo "To serve locally:"
 echo "  python3 -m http.server 8080 --directory build-wasm"
-echo "  open http://localhost:8080/cadvis.html"
+echo "  open http://localhost:8080"

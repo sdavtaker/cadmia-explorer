@@ -167,4 +167,5 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build
 
 # Serve WASM locally
 python3 -m http.server 8080 --directory build-wasm
+# open http://localhost:8080
 ```

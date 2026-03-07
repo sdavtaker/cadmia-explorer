@@ -70,7 +70,7 @@ if(BUILD_GUI)
         target_compile_options(cadvis_web PRIVATE -Wall -Wextra)
         set_target_properties(cadvis_web PROPERTIES
             OUTPUT_NAME "cadvis"
-            SUFFIX      ".html"
+            SUFFIX      ".js"
         )
         target_link_options(cadvis_web PRIVATE
             -sUSE_GLFW=3
@@ -81,7 +81,6 @@ if(BUILD_GUI)
             -sALLOW_MEMORY_GROWTH=1
             "-sEXPORTED_RUNTIME_METHODS=['ccall','FS']"
             "-sEXPORTED_FUNCTIONS=['_main','_reload_file']"
-            --shell-file ${CMAKE_SOURCE_DIR}/shell.html
         )
     else()
         # --- Desktop build (unchanged from Phase 2) ---
