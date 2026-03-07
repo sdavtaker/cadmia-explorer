@@ -51,7 +51,7 @@ struct GpuRectRenderer {
 
   /// Update the state texture from is_ancestor / selected_rect.
   /// Call once per frame before render_component().
-  void upload_state(const AppState &state);
+  void upload_state(const AppState &state) const;
 
   /// Push an AddCallback into dl that issues glDrawArraysInstanced.
   /// Must be called after upload_state() has run this frame.

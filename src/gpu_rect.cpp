@@ -170,16 +170,16 @@ void main() {
 // ---------------------------------------------------------------------------
 static unsigned int compile_shader(GLenum type, const char *preamble, const char *body) {
   unsigned int shader = glCreateShader(type);
-  const char *srcs[2] = {preamble, body};
-  glShaderSource(shader, 2, srcs, nullptr);
+  std::array<const char *, 2> srcs = {preamble, body};
+  glShaderSource(shader, 2, srcs.data(), nullptr);
   glCompileShader(shader);
   GLint ok = 0;
   glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
   if (ok == GL_FALSE) {
-    char log[1024];
-    glGetShaderInfoLog(shader, 1024, nullptr, log);
+    std::array<char, 1024> info_log{};
+    glGetShaderInfoLog(shader, 1024, nullptr, info_log.data());
     std::fprintf(stderr, "gpu_rect: shader compile error (%s):\n%s\n",
-                 type == GL_VERTEX_SHADER ? "vert" : "frag", log);
+                 type == GL_VERTEX_SHADER ? "vert" : "frag", info_log.data());
   }
   return shader;
 }
@@ -200,9 +200,9 @@ void GpuRectRenderer::init() {
     GLint ok = 0;
     glGetProgramiv(prog, GL_LINK_STATUS, &ok);
     if (ok == GL_FALSE) {
-      char log[1024];
-      glGetProgramInfoLog(prog, 1024, nullptr, log);
-      std::fprintf(stderr, "gpu_rect: link error:\n%s\n", log);
+      std::array<char, 1024> info_log{};
+      glGetProgramInfoLog(prog, 1024, nullptr, info_log.data());
+      std::fprintf(stderr, "gpu_rect: link error:\n%s\n", info_log.data());
     }
   }
   glDeleteShader(vs);
@@ -225,31 +225,36 @@ void GpuRectRenderer::init() {
   // loc 0: time_lo (float)
   glEnableVertexAttribArray(0);
   glVertexAttribPointer(0, 1, GL_FLOAT, GL_FALSE, sizeof(RectInstance),
-                        reinterpret_cast<const void *>(offsetof(RectInstance, time_lo)));
+                        reinterpret_cast<const void *>(
+                            offsetof(RectInstance, time_lo))); // NOLINT(performance-no-int-to-ptr)
   glVertexAttribDivisor(0, 1);
 
   // loc 1: time_hi (float)
   glEnableVertexAttribArray(1);
   glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, sizeof(RectInstance),
-                        reinterpret_cast<const void *>(offsetof(RectInstance, time_hi)));
+                        reinterpret_cast<const void *>(
+                            offsetof(RectInstance, time_hi))); // NOLINT(performance-no-int-to-ptr)
   glVertexAttribDivisor(1, 1);
 
   // loc 2: out_lo (float)
   glEnableVertexAttribArray(2);
   glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(RectInstance),
-                        reinterpret_cast<const void *>(offsetof(RectInstance, out_lo)));
+                        reinterpret_cast<const void *>(
+                            offsetof(RectInstance, out_lo))); // NOLINT(performance-no-int-to-ptr)
   glVertexAttribDivisor(2, 1);
 
   // loc 3: out_hi (float)
   glEnableVertexAttribArray(3);
   glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(RectInstance),
-                        reinterpret_cast<const void *>(offsetof(RectInstance, out_hi)));
+                        reinterpret_cast<const void *>(
+                            offsetof(RectInstance, out_hi))); // NOLINT(performance-no-int-to-ptr)
   glVertexAttribDivisor(3, 1);
 
   // loc 4: flags (uint) — must use IPointer to preserve integer bits
   glEnableVertexAttribArray(4);
   glVertexAttribIPointer(4, 1, GL_UNSIGNED_INT, sizeof(RectInstance),
-                         reinterpret_cast<const void *>(offsetof(RectInstance, flags)));
+                         reinterpret_cast<const void *>(
+                             offsetof(RectInstance, flags))); // NOLINT(performance-no-int-to-ptr)
   glVertexAttribDivisor(4, 1);
 
   glBindVertexArray(0);
@@ -330,7 +335,7 @@ void GpuRectRenderer::upload_rects(const Component &comp) {
 // ---------------------------------------------------------------------------
 // GpuRectRenderer::upload_state
 // ---------------------------------------------------------------------------
-void GpuRectRenderer::upload_state(const AppState &state) {
+void GpuRectRenderer::upload_state(const AppState &state) const {
   if (n_instances <= 0) {
     return;
   }
@@ -402,8 +407,8 @@ static void gpu_rect_callback(const ImDrawList * /*dl*/, const ImDrawCmd *cmd) {
   glGetIntegerv(GL_BLEND_DST_RGB, &prev_blend_dst_rgb);
   glGetIntegerv(GL_BLEND_SRC_ALPHA, &prev_blend_src_alpha);
   glGetIntegerv(GL_BLEND_DST_ALPHA, &prev_blend_dst_alpha);
-  GLint prev_scissor[4] = {};
-  glGetIntegerv(GL_SCISSOR_BOX, prev_scissor);
+  std::array<GLint, 4> prev_scissor{};
+  glGetIntegerv(GL_SCISSOR_BOX, prev_scissor.data());
 
   // ── scissor (OpenGL Y is bottom-up; payload Y is top-down) ───────────────
   glScissor(static_cast<GLint>(payload->clip_x1),
