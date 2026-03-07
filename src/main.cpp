@@ -37,6 +37,15 @@ static void usage(const char *argv0) {
 }
 
 int main(int argc, char *argv[]) {
+#ifdef __EMSCRIPTEN__
+  // Browser build: no argv, user loads file via "Open .cadvis..." button in sidebar
+  {
+    CadvisFile empty{};
+    run_app(empty);
+  }
+  return 0;
+#endif
+
   std::string input_path;
   std::string filter_component;
   bool render_all = false;

@@ -32,6 +32,7 @@ svgs/
 *.svg
 
 # Emscripten output
+build-wasm/
 *.wasm
 *.js.map
 
@@ -84,3 +85,6 @@ svgs/
 # debug information files
 *.dwo
 prompt.md
+
+# Large local test logs (not committed)
+counter_log.jsonl

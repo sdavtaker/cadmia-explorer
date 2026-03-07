@@ -159,6 +159,13 @@ pipenv run python preprocess/preprocess.py --log test_logs/job_tracker_log.jsonl
 # Render SVGs (one component)
 ./build/cadvis --component G1 --output-dir svgs/ out.cadvis
 
-# Build C++
+# Build C++ (desktop)
 cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build
+
+# Build WASM (requires emsdk sourced)
+./scripts/build_emscripten.sh
+
+# Serve WASM locally
+python3 -m http.server 8080 --directory build-wasm
+# open http://localhost:8080
 ```

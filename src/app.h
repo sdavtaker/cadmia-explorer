@@ -10,7 +10,8 @@ struct AppState {
 
   float pan_x = 0.0f; ///< Canvas pan, screen pixels
   float pan_y = 0.0f;
-  float zoom = 1.0f; ///< Canvas zoom multiplier
+  float zoom_x = 1.0f; ///< Horizontal zoom multiplier
+  float zoom_y = 1.0f; ///< Vertical zoom multiplier
 
   int selected_rect = -1;     ///< Index of clicked rect, or -1
   int selected_sub = 0;       ///< Which incoming edge to follow for ancestor highlighting

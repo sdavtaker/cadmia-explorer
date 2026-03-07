@@ -1,12 +1,18 @@
 #include "app.h"
 #include "layout.h"
 #include "logic.h"
+#include "reader.h"
 #include "renderer.h"
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/html5.h>
+#endif
 
 #include <algorithm>
 #include <array>
@@ -15,7 +21,24 @@
 #include <vector>
 
 static constexpr float SIDEBAR_W = 230.0f;
+#ifdef __EMSCRIPTEN__
+static constexpr const char *GLSL_VERSION = "#version 300 es";
+#else
 static constexpr const char *GLSL_VERSION = "#version 330";
+#endif
+
+// ---------------------------------------------------------------------------
+// Global application context (needed for Emscripten main-loop callback)
+// ---------------------------------------------------------------------------
+struct AppContext {
+  CadvisFile file;
+  AppState state;
+  Layout layout;
+  int layout_comp = -1;
+  GLFWwindow *window = nullptr;
+};
+
+static AppContext g_ctx; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 // ---------------------------------------------------------------------------
 // Helper: (re)initialise AppState for a given component index
@@ -24,7 +47,8 @@ static void reset_component(AppState &state, const CadvisFile &file, int idx) {
   state.cur_comp = idx;
   state.pan_x = 0.0f;
   state.pan_y = 0.0f;
-  state.zoom = 1.0f;
+  state.zoom_x = 1.0f;
+  state.zoom_y = 1.0f;
   state.selected_rect = -1;
   state.selected_sub = 0;
   state.selected_sub_count = 0;
@@ -39,6 +63,14 @@ static void reset_component(AppState &state, const CadvisFile &file, int idx) {
 // ---------------------------------------------------------------------------
 static void render_sidebar(AppState &state, const CadvisFile &file, bool &comp_changed) {
   comp_changed = false;
+
+#ifdef __EMSCRIPTEN__
+  if (ImGui::Button("Open .cadvis...")) {
+    // Trigger the hidden file input defined in shell.html
+    EM_ASM(document.getElementById('cadvis-input').click();); // NOLINT
+  }
+  ImGui::Separator();
+#endif
 
   // Component combo
   ImGui::TextUnformatted("Component:");
@@ -72,6 +104,21 @@ static void render_sidebar(AppState &state, const CadvisFile &file, bool &comp_c
   const Component &comp = file.components[static_cast<size_t>(state.cur_comp)];
   ImGui::Text("%d rect(s), %d edge(s)", static_cast<int>(comp.rects.size()),
               static_cast<int>(comp.edges.size()));
+
+  ImGui::Separator();
+  ImGui::TextUnformatted("Zoom:");
+  ImGui::SetNextItemWidth(-1.0f);
+  ImGui::SliderFloat("##zoom_x", &state.zoom_x, 0.05f, 40.0f, "H: %.2fx",
+                     ImGuiSliderFlags_Logarithmic);
+  ImGui::SetNextItemWidth(-1.0f);
+  ImGui::SliderFloat("##zoom_y", &state.zoom_y, 0.05f, 40.0f, "V: %.2fx",
+                     ImGuiSliderFlags_Logarithmic);
+  if (ImGui::Button("Reset view")) {
+    state.zoom_x = 1.0f;
+    state.zoom_y = 1.0f;
+    state.pan_x = 0.0f;
+    state.pan_y = 0.0f;
+  }
 
   if (state.selected_rect < 0) {
     ImGui::Separator();
@@ -175,8 +222,8 @@ static void render_canvas(AppState &state, const CadvisFile &file, Layout &layou
     if (!s_dragged) {
       // Click: hit test
       int hit = find_rect_under_cursor(comp, layout, canvas_pos.x, canvas_pos.y, canvas_size.x,
-                                       canvas_size.y, state.pan_x, state.pan_y, state.zoom,
-                                       io.MousePos.x, io.MousePos.y);
+                                       canvas_size.y, state.pan_x, state.pan_y, state.zoom_x,
+                                       state.zoom_y, io.MousePos.x, io.MousePos.y);
 
       state.selected_rect = hit;
       if (hit >= 0) {
@@ -193,15 +240,16 @@ static void render_canvas(AppState &state, const CadvisFile &file, Layout &layou
     s_dragged = false;
   }
 
-  // Zoom: scroll wheel (zoom around cursor)
+  // Zoom: scroll wheel (uniform zoom around cursor)
   if (is_hovered && io.MouseWheel != 0.0f) {
     float factor = (io.MouseWheel > 0.0f) ? 1.1f : (1.0f / 1.1f);
     // Keep the point under the cursor fixed
-    float lx = (io.MousePos.x - canvas_pos.x - state.pan_x) / state.zoom;
-    float ly = (io.MousePos.y - canvas_pos.y - state.pan_y) / state.zoom;
-    state.zoom = std::clamp(state.zoom * factor, 0.05f, 40.0f);
-    state.pan_x = io.MousePos.x - canvas_pos.x - lx * state.zoom;
-    state.pan_y = io.MousePos.y - canvas_pos.y - ly * state.zoom;
+    float lx = (io.MousePos.x - canvas_pos.x - state.pan_x) / state.zoom_x;
+    float ly = (io.MousePos.y - canvas_pos.y - state.pan_y) / state.zoom_y;
+    state.zoom_x = std::clamp(state.zoom_x * factor, 0.05f, 40.0f);
+    state.zoom_y = std::clamp(state.zoom_y * factor, 0.05f, 40.0f);
+    state.pan_x = io.MousePos.x - canvas_pos.x - lx * state.zoom_x;
+    state.pan_y = io.MousePos.y - canvas_pos.y - ly * state.zoom_y;
   }
 
   // PgUp / PgDn: cycle branch paths for selected multiplicity rect
@@ -219,9 +267,100 @@ static void render_canvas(AppState &state, const CadvisFile &file, Layout &layou
 }
 
 // ---------------------------------------------------------------------------
+// Per-frame loop body — shared by the desktop while-loop and Emscripten rAF
+// ---------------------------------------------------------------------------
+static void run_frame() {
+  glfwPollEvents();
+
+  // Rebuild layout when component changes
+  if (g_ctx.state.cur_comp != g_ctx.layout_comp) {
+    if (!g_ctx.file.components.empty()) {
+      reset_component(g_ctx.state, g_ctx.file, g_ctx.state.cur_comp);
+      if (!Layout::from_component(g_ctx.file.components[static_cast<size_t>(g_ctx.state.cur_comp)],
+                                  g_ctx.layout)) {
+        g_ctx.layout = Layout{};
+      }
+    }
+    g_ctx.layout_comp = g_ctx.state.cur_comp;
+  }
+
+  ImGui_ImplOpenGL3_NewFrame();
+  ImGui_ImplGlfw_NewFrame();
+  ImGui::NewFrame();
+
+  // Full-screen single window
+  const ImGuiWindowFlags wf =
+      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
+  ImGui::SetNextWindowPos({0.0f, 0.0f});
+  ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+  ImGui::Begin("##root", nullptr, wf);
+
+  // --- Sidebar ---
+  ImGui::BeginChild("##sidebar", {SIDEBAR_W, 0.0f}, ImGuiChildFlags_Borders);
+  bool comp_changed = false;
+  render_sidebar(g_ctx.state, g_ctx.file, comp_changed);
+  if (comp_changed && !g_ctx.file.components.empty()) {
+    reset_component(g_ctx.state, g_ctx.file, g_ctx.state.cur_comp);
+    if (!Layout::from_component(g_ctx.file.components[static_cast<size_t>(g_ctx.state.cur_comp)],
+                                g_ctx.layout)) {
+      g_ctx.layout = Layout{};
+    }
+    g_ctx.layout_comp = g_ctx.state.cur_comp;
+  }
+  ImGui::EndChild();
+
+  ImGui::SameLine();
+
+  // --- Canvas ---
+  ImGui::BeginChild("##canvas", {0.0f, 0.0f});
+  render_canvas(g_ctx.state, g_ctx.file, g_ctx.layout);
+  ImGui::EndChild();
+
+  ImGui::End();
+
+  // Render
+  ImGui::Render();
+  int fb_w;
+  int fb_h;
+  glfwGetFramebufferSize(g_ctx.window, &fb_w, &fb_h);
+  glViewport(0, 0, fb_w, fb_h);
+  glClearColor(0.15f, 0.15f, 0.15f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT);
+  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+  glfwSwapBuffers(g_ctx.window);
+}
+
+// ---------------------------------------------------------------------------
+// Emscripten: exported C function to load a .cadvis file written to MEMFS.
+// JavaScript usage:
+//   FS.writeFile('/upload.cadvis', new Uint8Array(arrayBuffer));
+//   Module.ccall('reload_file', 'void', ['string'], ['/upload.cadvis']);
+// ---------------------------------------------------------------------------
+#ifdef __EMSCRIPTEN__
+extern "C" EMSCRIPTEN_KEEPALIVE void reload_file(const char *path) {
+  try {
+    g_ctx.file = read_cadvis(path);
+  } catch (const std::exception &e) {
+    std::fprintf(stderr, "Failed to load '%s': %s\n", path, e.what());
+    return;
+  } catch (...) {
+    std::fprintf(stderr, "Failed to load '%s': unknown error\n", path);
+    return;
+  }
+  if (!g_ctx.file.components.empty()) {
+    g_ctx.state = {};
+    g_ctx.layout_comp = -1;
+    reset_component(g_ctx.state, g_ctx.file, 0);
+  }
+}
+#endif
+
+// ---------------------------------------------------------------------------
 // Application entry point
 // ---------------------------------------------------------------------------
 void run_app(const CadvisFile &file) {
+  g_ctx.file = file;
+
   // ------------------------------------------------------------------
   // GLFW init
   // ------------------------------------------------------------------
@@ -232,20 +371,26 @@ void run_app(const CadvisFile &file) {
     return;
   }
 
+#ifdef __EMSCRIPTEN__
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+  glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+#else
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 #ifdef __APPLE__
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
+#endif
 
-  GLFWwindow *window = glfwCreateWindow(1280, 800, "cadmia-explorer", nullptr, nullptr);
-  if (window == nullptr) {
+  g_ctx.window = glfwCreateWindow(1280, 800, "cadmia-explorer", nullptr, nullptr);
+  if (g_ctx.window == nullptr) {
     std::fprintf(stderr, "Failed to create GLFW window\n");
     glfwTerminate();
     return;
   }
-  glfwMakeContextCurrent(window);
+  glfwMakeContextCurrent(g_ctx.window);
   glfwSwapInterval(1); // vsync
 
   // ------------------------------------------------------------------
@@ -258,72 +403,25 @@ void run_app(const CadvisFile &file) {
 
   ImGui::StyleColorsDark();
 
-  ImGui_ImplGlfw_InitForOpenGL(window, true);
+  ImGui_ImplGlfw_InitForOpenGL(g_ctx.window, true);
   ImGui_ImplOpenGL3_Init(GLSL_VERSION);
 
   // ------------------------------------------------------------------
-  // Per-component layout cache
+  // Initial state
   // ------------------------------------------------------------------
-  AppState state{};
-  Layout layout{};
-  int layout_comp = -1; // which component the layout was built for
+  g_ctx.state = {};
+  g_ctx.layout = {};
+  g_ctx.layout_comp = -1;
 
   // ------------------------------------------------------------------
   // Main loop
   // ------------------------------------------------------------------
-  while (glfwWindowShouldClose(window) == GLFW_FALSE) {
-    glfwPollEvents();
-
-    // Rebuild state / layout when component changes
-    if (state.cur_comp != layout_comp) {
-      if (!file.components.empty()) {
-        reset_component(state, file, state.cur_comp);
-        Layout::from_component(file.components[static_cast<size_t>(state.cur_comp)], layout);
-      }
-      layout_comp = state.cur_comp;
-    }
-
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-
-    // Full-screen single window
-    const ImGuiWindowFlags wf =
-        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
-    ImGui::SetNextWindowPos({0.0f, 0.0f});
-    ImGui::SetNextWindowSize(io.DisplaySize);
-    ImGui::Begin("##root", nullptr, wf);
-
-    // --- Sidebar ---
-    ImGui::BeginChild("##sidebar", {SIDEBAR_W, 0.0f}, ImGuiChildFlags_Borders);
-    bool comp_changed = false;
-    render_sidebar(state, file, comp_changed);
-    if (comp_changed && !file.components.empty()) {
-      reset_component(state, file, state.cur_comp);
-      Layout::from_component(file.components[static_cast<size_t>(state.cur_comp)], layout);
-      layout_comp = state.cur_comp;
-    }
-    ImGui::EndChild();
-
-    ImGui::SameLine();
-
-    // --- Canvas ---
-    ImGui::BeginChild("##canvas", {0.0f, 0.0f});
-    render_canvas(state, file, layout);
-    ImGui::EndChild();
-
-    ImGui::End();
-
-    // Render
-    ImGui::Render();
-    int fb_w;
-    int fb_h;
-    glfwGetFramebufferSize(window, &fb_w, &fb_h);
-    glViewport(0, 0, fb_w, fb_h);
-    glClearColor(0.15f, 0.15f, 0.15f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-    glfwSwapBuffers(window);
+#ifdef __EMSCRIPTEN__
+  emscripten_set_main_loop(run_frame, 0, 1); // 0 = rAF rate, 1 = simulate_infinite_loop
+  return;                                    // unreachable; browser handles cleanup
+#else
+  while (glfwWindowShouldClose(g_ctx.window) == GLFW_FALSE) {
+    run_frame();
   }
 
   // ------------------------------------------------------------------
@@ -332,6 +430,7 @@ void run_app(const CadvisFile &file) {
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
-  glfwDestroyWindow(window);
+  glfwDestroyWindow(g_ctx.window);
   glfwTerminate();
+#endif
 }

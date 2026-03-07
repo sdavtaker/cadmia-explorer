@@ -67,6 +67,41 @@ If you have no X11/display headers (e.g. a headless server):
 
 Open any `.svg` file in a browser to view the plot.
 
+### Browser Viewer (WebAssembly)
+
+The viewer can also be compiled to WebAssembly and run in any modern browser — no install
+required for end users.
+
+**Prerequisites**: [emsdk](https://github.com/emscripten-core/emsdk) installed and activated.
+
+```bash
+# First-time emsdk setup (once per machine)
+git clone https://github.com/emscripten-core/emsdk.git ~/emsdk
+~/emsdk/emsdk install latest
+~/emsdk/emsdk activate latest
+source ~/emsdk/emsdk_env.sh
+
+# Build the WASM viewer
+./scripts/build_emscripten.sh
+```
+
+This produces `build-wasm/cadvis.js`, `build-wasm/cadvis.wasm`, and `build-wasm/index.html`.
+
+**Serve locally for testing** (browsers require a server — `file://` won't work due to CORS):
+
+```bash
+python3 -m http.server 8080 --directory build-wasm
+```
+
+Then open **http://localhost:8080** in your browser.
+
+Once the canvas loads, click **"Open .cadvis..."** in the sidebar, select a `.cadvis` file from
+disk, and the component dropdown and plot will populate. All interactive controls (pan, zoom,
+click, PgUp/PgDn) work identically to the desktop viewer.
+
+**To share with others**, copy the three files (`index.html`, `cadvis.js`, `cadvis.wasm`) to
+any static web host (GitHub Pages, nginx, S3, etc.) — no server-side logic required.
+
 ### Compound Output Mapping
 
 For models whose outputs are compound strings (e.g. `"[j1:1, j1:1]"`), provide a Python
@@ -92,7 +127,8 @@ pipenv run python preprocess/preprocess.py \
 |---|---|---|
 | 1 | Complete | Python preprocessor + C++ SVG renderer |
 | 2 | Complete | Interactive Dear ImGui desktop viewer |
-| 3 | Planned | WebGL2 instanced rendering for GB-scale logs |
+| 3a | Complete | Emscripten WASM port — browser viewer, no install required |
+| 3b | Planned | GPU instanced rendering (glDrawArraysInstanced) for GB-scale logs |
 
 ## Project Layout
 
