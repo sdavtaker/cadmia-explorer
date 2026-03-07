@@ -4,6 +4,10 @@
 #include "reader.h"
 #include "renderer.h"
 
+#ifdef CADVIS_GUI
+#include "gpu_rect.h"
+#endif
+
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -36,6 +40,10 @@ struct AppContext {
   Layout layout;
   int layout_comp = -1;
   GLFWwindow *window = nullptr;
+#ifdef CADVIS_GUI
+  GpuRectRenderer gpu_rect;
+  bool rects_dirty = true;
+#endif
 };
 
 static AppContext g_ctx; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
@@ -160,7 +168,8 @@ static void render_sidebar(AppState &state, const CadvisFile &file, bool &comp_c
 // ---------------------------------------------------------------------------
 // Canvas rendering + input
 // ---------------------------------------------------------------------------
-static void render_canvas(AppState &state, const CadvisFile &file, Layout &layout) {
+static void render_canvas(AppState &state, const CadvisFile &file, Layout &layout, float pre_zoom_x,
+                          float pre_zoom_y, float pre_pan_x, float pre_pan_y) {
   if (file.components.empty()) {
     ImGui::TextDisabled("No components to display");
     return;
@@ -175,6 +184,18 @@ static void render_canvas(AppState &state, const CadvisFile &file, Layout &layou
   }
   if (canvas_size.y < 1.0f) {
     canvas_size.y = 1.0f;
+  }
+
+  // Keep canvas center fixed when zoom changes via sliders.
+  // Condition: zoom changed but pan did not (sliders only change zoom;
+  // Reset-view and component changes always also modify pan).
+  if (state.zoom_x != pre_zoom_x && state.pan_x == pre_pan_x && pre_zoom_x > 0.0f) {
+    float lx = (canvas_size.x * 0.5f - state.pan_x) / pre_zoom_x;
+    state.pan_x = canvas_size.x * 0.5f - lx * state.zoom_x;
+  }
+  if (state.zoom_y != pre_zoom_y && state.pan_y == pre_pan_y && pre_zoom_y > 0.0f) {
+    float ly = (canvas_size.y * 0.5f - state.pan_y) / pre_zoom_y;
+    state.pan_y = canvas_size.y * 0.5f - ly * state.zoom_y;
   }
 
   // Invisible button captures mouse events for this region
@@ -192,7 +213,16 @@ static void render_canvas(AppState &state, const CadvisFile &file, Layout &layou
   dl->AddRectFilled(canvas_pos, clip_max, IM_COL32(250, 250, 250, 255));
 
   // Component plot
-  render_component(dl, comp, layout, state, canvas_pos, canvas_size);
+  ImVec2 display_size = ImGui::GetIO().DisplaySize;
+  ImVec4 clip_rect{canvas_pos.x, canvas_pos.y, canvas_pos.x + canvas_size.x,
+                   canvas_pos.y + canvas_size.y};
+  render_component(dl, comp, layout, state, canvas_pos, canvas_size, display_size, clip_rect,
+#ifdef CADVIS_GUI
+                   &g_ctx.gpu_rect
+#else
+                   nullptr
+#endif
+  );
 
   dl->PopClipRect();
 
@@ -282,11 +312,24 @@ static void run_frame() {
       }
     }
     g_ctx.layout_comp = g_ctx.state.cur_comp;
+#ifdef CADVIS_GUI
+    g_ctx.rects_dirty = true;
+#endif
   }
 
   ImGui_ImplOpenGL3_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
+
+#ifdef CADVIS_GUI
+  if (g_ctx.rects_dirty && !g_ctx.file.components.empty()) {
+    g_ctx.gpu_rect.upload_rects(g_ctx.file.components[static_cast<size_t>(g_ctx.state.cur_comp)]);
+    g_ctx.rects_dirty = false;
+  }
+  if (!g_ctx.file.components.empty()) {
+    g_ctx.gpu_rect.upload_state(g_ctx.state);
+  }
+#endif
 
   // Full-screen single window
   const ImGuiWindowFlags wf =
@@ -296,6 +339,12 @@ static void run_frame() {
   ImGui::Begin("##root", nullptr, wf);
 
   // --- Sidebar ---
+  // Capture zoom/pan before the sidebar so render_canvas can detect slider-only changes.
+  float pre_zoom_x = g_ctx.state.zoom_x;
+  float pre_zoom_y = g_ctx.state.zoom_y;
+  float pre_pan_x = g_ctx.state.pan_x;
+  float pre_pan_y = g_ctx.state.pan_y;
+
   ImGui::BeginChild("##sidebar", {SIDEBAR_W, 0.0f}, ImGuiChildFlags_Borders);
   bool comp_changed = false;
   render_sidebar(g_ctx.state, g_ctx.file, comp_changed);
@@ -306,6 +355,14 @@ static void run_frame() {
       g_ctx.layout = Layout{};
     }
     g_ctx.layout_comp = g_ctx.state.cur_comp;
+#ifdef CADVIS_GUI
+    g_ctx.rects_dirty = true;
+#endif
+    // Zoom/pan were reset by component change — no center-fix needed.
+    pre_zoom_x = g_ctx.state.zoom_x;
+    pre_zoom_y = g_ctx.state.zoom_y;
+    pre_pan_x = g_ctx.state.pan_x;
+    pre_pan_y = g_ctx.state.pan_y;
   }
   ImGui::EndChild();
 
@@ -313,7 +370,8 @@ static void run_frame() {
 
   // --- Canvas ---
   ImGui::BeginChild("##canvas", {0.0f, 0.0f});
-  render_canvas(g_ctx.state, g_ctx.file, g_ctx.layout);
+  render_canvas(g_ctx.state, g_ctx.file, g_ctx.layout, pre_zoom_x, pre_zoom_y, pre_pan_x,
+                pre_pan_y);
   ImGui::EndChild();
 
   ImGui::End();
@@ -351,6 +409,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE void reload_file(const char *path) {
     g_ctx.state = {};
     g_ctx.layout_comp = -1;
     reset_component(g_ctx.state, g_ctx.file, 0);
+#ifdef CADVIS_GUI
+    g_ctx.rects_dirty = true;
+#endif
   }
 }
 #endif
@@ -406,6 +467,10 @@ void run_app(const CadvisFile &file) {
   ImGui_ImplGlfw_InitForOpenGL(g_ctx.window, true);
   ImGui_ImplOpenGL3_Init(GLSL_VERSION);
 
+#ifdef CADVIS_GUI
+  g_ctx.gpu_rect.init();
+#endif
+
   // ------------------------------------------------------------------
   // Initial state
   // ------------------------------------------------------------------
@@ -427,6 +492,9 @@ void run_app(const CadvisFile &file) {
   // ------------------------------------------------------------------
   // Cleanup
   // ------------------------------------------------------------------
+#ifdef CADVIS_GUI
+  g_ctx.gpu_rect.destroy();
+#endif
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
