@@ -16,10 +16,12 @@ struct VP {
 
   // Layout coordinates → screen coordinates
   [[nodiscard]] float sx(double lx) const {
-    return ox + (static_cast<float>(lx) / static_cast<float>(Layout::CANVAS_W) * sw) * zoom_x + pan_x;
+    return ox + (static_cast<float>(lx) / static_cast<float>(Layout::CANVAS_W) * sw) * zoom_x +
+           pan_x;
   }
   [[nodiscard]] float sy(double ly) const {
-    return oy + (static_cast<float>(ly) / static_cast<float>(Layout::CANVAS_H) * sh) * zoom_y + pan_y;
+    return oy + (static_cast<float>(ly) / static_cast<float>(Layout::CANVAS_H) * sh) * zoom_y +
+           pan_y;
   }
 };
 
@@ -224,7 +226,7 @@ static void draw_axes(ImDrawList *dl, const Component &comp, const Layout &layou
 void render_component(ImDrawList *dl, const Component &comp, const Layout &layout, AppState &state,
                       ImVec2 canvas_pos, ImVec2 canvas_size) {
   VP vp{canvas_pos.x, canvas_pos.y, canvas_size.x, canvas_size.y,
-        state.zoom_x, state.zoom_y, state.pan_x,  state.pan_y};
+        state.zoom_x, state.zoom_y, state.pan_x,   state.pan_y};
 
   bool anything_selected = (state.selected_rect >= 0);
 

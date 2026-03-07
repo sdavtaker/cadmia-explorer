@@ -175,9 +175,9 @@ TEST_CASE("find_rect_under_cursor: click inside single rect") {
   double cx_l = (layout.time_to_px(1.0) + layout.time_to_px(2.0)) / 2.0;
   double cy_l = (layout.out_to_py(1.0) + layout.out_to_py(2.0)) / 2.0;
 
-  int hit =
-      find_rect_under_cursor(c, layout, 0.0f, 0.0f, (float)Layout::CANVAS_W,
-                             (float)Layout::CANVAS_H, 0.0f, 0.0f, 1.0f, 1.0f, (float)cx_l, (float)cy_l);
+  int hit = find_rect_under_cursor(c, layout, 0.0f, 0.0f, (float)Layout::CANVAS_W,
+                                   (float)Layout::CANVAS_H, 0.0f, 0.0f, 1.0f, 1.0f, (float)cx_l,
+                                   (float)cy_l);
   REQUIRE(hit == 0);
 }
 
@@ -202,9 +202,9 @@ TEST_CASE("find_rect_under_cursor: last overlapping rect wins") {
   double cx_l = (layout.time_to_px(1.0) + layout.time_to_px(2.0)) / 2.0;
   double cy_l = (layout.out_to_py(1.0) + layout.out_to_py(2.0)) / 2.0;
 
-  int hit =
-      find_rect_under_cursor(c, layout, 0.0f, 0.0f, (float)Layout::CANVAS_W,
-                             (float)Layout::CANVAS_H, 0.0f, 0.0f, 1.0f, 1.0f, (float)cx_l, (float)cy_l);
+  int hit = find_rect_under_cursor(c, layout, 0.0f, 0.0f, (float)Layout::CANVAS_W,
+                                   (float)Layout::CANVAS_H, 0.0f, 0.0f, 1.0f, 1.0f, (float)cx_l,
+                                   (float)cy_l);
   REQUIRE(hit == 1); // higher index wins
 }
 
