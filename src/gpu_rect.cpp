@@ -82,6 +82,16 @@ void main() {
     float sy1 = u_y_transform.x * a_out_hi + u_y_transform.y;
     float sy2 = u_y_transform.x * a_out_lo + u_y_transform.y;
 
+    // Point-interval rects (out_lo == out_hi) produce zero-height quads which
+    // rasterise nothing.  Expand to a minimum 2-pixel-tall strip so they remain
+    // visible while staying unobtrusive.
+    const float MIN_RECT_H = 2.0;
+    if (sy2 - sy1 < MIN_RECT_H) {
+        float mid_y = 0.5 * (sy1 + sy2);
+        sy1 = mid_y - MIN_RECT_H * 0.5;
+        sy2 = mid_y + MIN_RECT_H * 0.5;
+    }
+
     // Viewport cull: emit degenerate triangle if entirely outside clip rect
     if (sx2 < u_clip_rect.x || sx1 > u_clip_rect.z ||
         sy2 < u_clip_rect.y || sy1 > u_clip_rect.w) {
