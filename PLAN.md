@@ -421,6 +421,26 @@ For GB-scale logs with tens of thousands of visible rects:
 
 ---
 
+## Known Issues
+
+### Dashed borders not visually distinguishable from solid borders (Phase 3b)
+
+The GPU fragment shader encodes open interval bounds as dashed borders and closed bounds as
+solid borders (matching the SVG renderer). However, in practice the dashes are not clearly
+visible — the difference between dashed and solid is imperceptible at typical zoom levels and
+rect sizes.
+
+**Root cause (suspected):** The dash parameters (`DASH_ON = 4.0 px`, `DASH_CYCLE = 7.0 px`,
+`BWIDTH = 1.5 px`) were chosen to match the SVG output, but at screen resolution the 1.5 px
+border is too thin and the 3 px gaps too short to read clearly. On high-DPI displays the
+problem is compounded by sub-pixel rendering.
+
+**Deferred to a future phase.** Potential fixes include: thicker borders, larger dash/gap
+ratio, a distinct color or opacity for open vs. closed sides instead of (or in addition to)
+the dash pattern.
+
+---
+
 ## Known Non-Issues
 
 These have been raised by automated reviewers and investigated; no action is needed.
