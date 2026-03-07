@@ -4,6 +4,10 @@
 #include "reader.h"
 #include "renderer.h"
 
+#ifdef CADVIS_GUI
+#include "gpu_rect.h"
+#endif
+
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -36,6 +40,10 @@ struct AppContext {
   Layout layout;
   int layout_comp = -1;
   GLFWwindow *window = nullptr;
+#ifdef CADVIS_GUI
+  GpuRectRenderer gpu_rect;
+  bool rects_dirty = true;
+#endif
 };
 
 static AppContext g_ctx; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
@@ -192,7 +200,16 @@ static void render_canvas(AppState &state, const CadvisFile &file, Layout &layou
   dl->AddRectFilled(canvas_pos, clip_max, IM_COL32(250, 250, 250, 255));
 
   // Component plot
-  render_component(dl, comp, layout, state, canvas_pos, canvas_size);
+  ImVec2 display_size = ImGui::GetIO().DisplaySize;
+  ImVec4 clip_rect{canvas_pos.x, canvas_pos.y, canvas_pos.x + canvas_size.x,
+                   canvas_pos.y + canvas_size.y};
+  render_component(dl, comp, layout, state, canvas_pos, canvas_size, display_size, clip_rect,
+#ifdef CADVIS_GUI
+                   &g_ctx.gpu_rect
+#else
+                   nullptr
+#endif
+  );
 
   dl->PopClipRect();
 
@@ -282,11 +299,24 @@ static void run_frame() {
       }
     }
     g_ctx.layout_comp = g_ctx.state.cur_comp;
+#ifdef CADVIS_GUI
+    g_ctx.rects_dirty = true;
+#endif
   }
 
   ImGui_ImplOpenGL3_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
+
+#ifdef CADVIS_GUI
+  if (g_ctx.rects_dirty && !g_ctx.file.components.empty()) {
+    g_ctx.gpu_rect.upload_rects(g_ctx.file.components[static_cast<size_t>(g_ctx.state.cur_comp)]);
+    g_ctx.rects_dirty = false;
+  }
+  if (!g_ctx.file.components.empty()) {
+    g_ctx.gpu_rect.upload_state(g_ctx.state);
+  }
+#endif
 
   // Full-screen single window
   const ImGuiWindowFlags wf =
@@ -306,6 +336,9 @@ static void run_frame() {
       g_ctx.layout = Layout{};
     }
     g_ctx.layout_comp = g_ctx.state.cur_comp;
+#ifdef CADVIS_GUI
+    g_ctx.rects_dirty = true;
+#endif
   }
   ImGui::EndChild();
 
@@ -351,6 +384,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE void reload_file(const char *path) {
     g_ctx.state = {};
     g_ctx.layout_comp = -1;
     reset_component(g_ctx.state, g_ctx.file, 0);
+#ifdef CADVIS_GUI
+    g_ctx.rects_dirty = true;
+#endif
   }
 }
 #endif
@@ -406,6 +442,10 @@ void run_app(const CadvisFile &file) {
   ImGui_ImplGlfw_InitForOpenGL(g_ctx.window, true);
   ImGui_ImplOpenGL3_Init(GLSL_VERSION);
 
+#ifdef CADVIS_GUI
+  g_ctx.gpu_rect.init();
+#endif
+
   // ------------------------------------------------------------------
   // Initial state
   // ------------------------------------------------------------------
@@ -427,6 +467,9 @@ void run_app(const CadvisFile &file) {
   // ------------------------------------------------------------------
   // Cleanup
   // ------------------------------------------------------------------
+#ifdef CADVIS_GUI
+  g_ctx.gpu_rect.destroy();
+#endif
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();

@@ -5,13 +5,18 @@
 
 #include <imgui.h>
 
+#ifdef CADVIS_GUI
+struct GpuRectRenderer; // forward declaration
+#endif
+
 /// Render one component's plot onto an ImDrawList.
 ///
-/// Coordinate transform (layout px → screen px):
-///   screen_x = canvas_pos.x + (layout_px / CANVAS_W * canvas_size.x) * zoom + pan_x
-///   screen_y = canvas_pos.y + (layout_py / CANVAS_H * canvas_size.y) * zoom + pan_y
+/// Rect fills and per-side dashed/solid borders are drawn via GPU instancing
+/// (injected through an ImDrawList::AddCallback). Edges, axes, and multiplicity
+/// labels remain in ImDrawList.
 ///
-/// Handles: rect fills, per-side dashed/solid borders, edges (line/bezier + arrowhead),
-/// axes, multiplicity labels, and ancestor highlighting.
+/// gpu_rect must be non-null when CADVIS_GUI is defined; pass nullptr for
+/// headless builds where the GPU path is not compiled in.
 void render_component(ImDrawList *dl, const Component &comp, const Layout &layout, AppState &state,
-                      ImVec2 canvas_pos, ImVec2 canvas_size);
+                      ImVec2 canvas_pos, ImVec2 canvas_size, ImVec2 display_size, ImVec4 clip_rect,
+                      GpuRectRenderer *gpu_rect);

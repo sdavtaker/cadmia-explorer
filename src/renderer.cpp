@@ -1,6 +1,10 @@
 #include "renderer.h"
 #include "logic.h"
 
+#ifdef CADVIS_GUI
+#include "gpu_rect.h"
+#endif
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -28,33 +32,6 @@ struct VP {
 // ---------------------------------------------------------------------------
 // Drawing helpers
 // ---------------------------------------------------------------------------
-static void dashed_line(ImDrawList *dl, ImVec2 p0, ImVec2 p1, ImU32 col, float thick,
-                        float dash_len = 4.0f, float gap_len = 3.0f) {
-  float dx = p1.x - p0.x;
-  float dy = p1.y - p0.y;
-  float len = std::sqrt(dx * dx + dy * dy);
-  if (len < 0.5f) {
-    return;
-  }
-  float nx = dx / len;
-  float ny = dy / len;
-  float pos = 0.0f;
-  bool drawing = true;
-  while (pos < len) {
-    float seg = drawing ? dash_len : gap_len;
-    float end = pos + seg;
-    if (end > len) {
-      end = len;
-    }
-    if (drawing) {
-      dl->AddLine({p0.x + nx * pos, p0.y + ny * pos}, {p0.x + nx * end, p0.y + ny * end}, col,
-                  thick);
-    }
-    pos = end;
-    drawing = !drawing;
-  }
-}
-
 static void arrow_tip(ImDrawList *dl, ImVec2 tip, ImVec2 from_pt, ImU32 col, float size = 7.0f) {
   float dx = tip.x - from_pt.x;
   float dy = tip.y - from_pt.y;
@@ -64,60 +41,12 @@ static void arrow_tip(ImDrawList *dl, ImVec2 tip, ImVec2 from_pt, ImU32 col, flo
   }
   float nx = dx / len;
   float ny = dy / len;
-  float px = -ny;
-  float py = nx;
+  float ppx = -ny;
+  float ppy = nx;
   float half = size * 0.38f;
   ImVec2 base = {tip.x - nx * size, tip.y - ny * size};
-  dl->AddTriangleFilled(tip, {base.x + px * half, base.y + py * half},
-                        {base.x - px * half, base.y - py * half}, col);
-}
-
-// ---------------------------------------------------------------------------
-// Rect rendering
-// ---------------------------------------------------------------------------
-static void draw_rect(ImDrawList *dl, const Rect &r, const Layout &layout, const VP &vp,
-                      ImU32 fill_col, ImU32 border_col) {
-  float x1 = vp.sx(layout.time_to_px(r.time_lo));
-  float x2 = vp.sx(layout.time_to_px(r.time_lo) + layout.rect_pw(r));
-  float y1 = vp.sy(layout.out_to_py(r.out_hi));
-  float y2 = vp.sy(layout.out_to_py(r.out_hi) + layout.rect_ph(r));
-
-  // Fill
-  dl->AddRectFilled({x1, y1}, {x2, y2}, fill_col);
-
-  // Per-side borders: left=time_lo, right=time_hi, top=out_hi, bottom=out_lo
-  float thick = 1.0f;
-  if (r.time_lo_closed) {
-    dl->AddLine({x1, y1}, {x1, y2}, border_col, thick);
-  } else {
-    dashed_line(dl, {x1, y1}, {x1, y2}, border_col, thick);
-  }
-
-  if (r.time_hi_closed) {
-    dl->AddLine({x2, y1}, {x2, y2}, border_col, thick);
-  } else {
-    dashed_line(dl, {x2, y1}, {x2, y2}, border_col, thick);
-  }
-
-  if (r.out_hi_closed) {
-    dl->AddLine({x1, y1}, {x2, y1}, border_col, thick);
-  } else {
-    dashed_line(dl, {x1, y1}, {x2, y1}, border_col, thick);
-  }
-
-  if (r.out_lo_closed) {
-    dl->AddLine({x1, y2}, {x2, y2}, border_col, thick);
-  } else {
-    dashed_line(dl, {x1, y2}, {x2, y2}, border_col, thick);
-  }
-
-  // Multiplicity label ×N in top-right corner
-  if (r.multiplicity > 1) {
-    std::array<char, 32> buf;
-    std::snprintf(buf.data(), buf.size(), "\xc3\x97%u", r.multiplicity); // ×N
-    ImVec2 tsz = ImGui::CalcTextSize(buf.data());
-    dl->AddText({x2 - tsz.x - 2.0f, y1 + 1.0f}, border_col, buf.data());
-  }
+  dl->AddTriangleFilled(tip, {base.x + ppx * half, base.y + ppy * half},
+                        {base.x - ppx * half, base.y - ppy * half}, col);
 }
 
 // ---------------------------------------------------------------------------
@@ -134,7 +63,6 @@ static void draw_edges(ImDrawList *dl, const Component &comp, const Layout &layo
     const Rect &fr = comp.rects[e.from];
     const Rect &tr = comp.rects[e.to];
 
-    // Determine if this edge lies on the highlighted ancestor path
     bool on_path = anything_selected && e.from < state.is_ancestor.size() &&
                    state.is_ancestor[e.from] && e.to < state.is_ancestor.size() &&
                    state.is_ancestor[e.to];
@@ -152,16 +80,14 @@ static void draw_edges(ImDrawList *dl, const Component &comp, const Layout &layo
       thickness = 1.0f;
     }
 
-    // Source: center-right of source rect
     double fr_rx = layout.time_to_px(fr.time_lo) + layout.rect_pw(fr);
     ImVec2 sp = {vp.sx(fr_rx), vp.sy(layout.out_to_py(fr.out_hi) + layout.rect_ph(fr) / 2.0)};
 
-    // Target: center-left of target rect
     double tr_lx = layout.time_to_px(tr.time_lo);
     ImVec2 tp = {vp.sx(tr_lx), vp.sy(layout.out_to_py(tr.out_hi) + layout.rect_ph(tr) / 2.0)};
 
-    float dx = std::abs(tp.x - sp.x);
-    if (dx < 10.0f) {
+    float ddx = std::abs(tp.x - sp.x);
+    if (ddx < 10.0f) {
       ImVec2 cp1 = {sp.x - 40.0f, sp.y};
       ImVec2 cp2 = {tp.x + 40.0f, tp.y};
       dl->AddBezierCubic(sp, cp1, cp2, tp, edge_col, thickness);
@@ -209,14 +135,13 @@ static void draw_axes(ImDrawList *dl, const Component &comp, const Layout &layou
   for (const auto &r : comp.rects) {
     y_vals.insert(r.out_lo);
   }
-
   for (double y : y_vals) {
-    float py = vp.sy(layout.out_to_py(y));
-    dl->AddLine({ay_x - 5.0f, py}, {ay_x, py}, axis_col, 1.0f);
+    float pyy = vp.sy(layout.out_to_py(y));
+    dl->AddLine({ay_x - 5.0f, pyy}, {ay_x, pyy}, axis_col, 1.0f);
     std::array<char, 32> buf;
     std::snprintf(buf.data(), buf.size(), "%.3g", y);
     ImVec2 tsz = ImGui::CalcTextSize(buf.data());
-    dl->AddText({ay_x - 8.0f - tsz.x, py - tsz.y * 0.5f}, text_col, buf.data());
+    dl->AddText({ay_x - 8.0f - tsz.x, pyy - tsz.y * 0.5f}, text_col, buf.data());
   }
 }
 
@@ -224,37 +149,49 @@ static void draw_axes(ImDrawList *dl, const Component &comp, const Layout &layou
 // Main entry point
 // ---------------------------------------------------------------------------
 void render_component(ImDrawList *dl, const Component &comp, const Layout &layout, AppState &state,
-                      ImVec2 canvas_pos, ImVec2 canvas_size) {
+                      ImVec2 canvas_pos, ImVec2 canvas_size, ImVec2 display_size, ImVec4 clip_rect,
+                      GpuRectRenderer *gpu_rect) {
   VP vp{canvas_pos.x, canvas_pos.y, canvas_size.x, canvas_size.y,
         state.zoom_x, state.zoom_y, state.pan_x,   state.pan_y};
 
-  bool anything_selected = (state.selected_rect >= 0);
+  // GPU-instanced rect fill + per-side dashed/solid borders
+#ifdef CADVIS_GUI
+  if (gpu_rect != nullptr) {
+    gpu_rect->draw(dl, canvas_pos, canvas_size, display_size, clip_rect, layout, state);
+  }
+#else
+  (void)gpu_rect;
+  (void)display_size;
+  (void)clip_rect;
+#endif
 
-  // Edges first (lower z-order)
+  // Edges (remain in ImDrawList)
   draw_edges(dl, comp, layout, vp, state);
 
-  // Rects
+  // Multiplicity labels (×N) — GPU shader has no text rendering
+  bool anything_selected = (state.selected_rect >= 0);
   for (int i = 0; i < static_cast<int>(comp.rects.size()); ++i) {
     const Rect &r = comp.rects[static_cast<size_t>(i)];
-
-    ImU32 fill_col;
-    ImU32 border_col;
+    if (r.multiplicity <= 1) {
+      continue;
+    }
+    float x2 = vp.sx(layout.time_to_px(r.time_lo) + layout.rect_pw(r));
+    float y1 = vp.sy(layout.out_to_py(r.out_hi));
+    std::array<char, 32> buf;
+    std::snprintf(buf.data(), buf.size(), "\xc3\x97%u", r.multiplicity);
+    ImVec2 tsz = ImGui::CalcTextSize(buf.data());
+    ImU32 label_col;
     if (!anything_selected) {
-      fill_col = IM_COL32(70, 130, 180, 100);
-      border_col = IM_COL32(50, 90, 140, 220);
+      label_col = IM_COL32(50, 90, 140, 220);
     } else if (i == state.selected_rect) {
-      fill_col = IM_COL32(255, 170, 30, 200);
-      border_col = IM_COL32(180, 100, 0, 255);
+      label_col = IM_COL32(180, 100, 0, 255);
     } else if (static_cast<size_t>(i) < state.is_ancestor.size() &&
                state.is_ancestor[static_cast<size_t>(i)]) {
-      fill_col = IM_COL32(70, 130, 180, 200);
-      border_col = IM_COL32(50, 90, 140, 255);
+      label_col = IM_COL32(50, 90, 140, 255);
     } else {
-      fill_col = IM_COL32(70, 130, 180, 28);
-      border_col = IM_COL32(50, 90, 140, 60);
+      label_col = IM_COL32(50, 90, 140, 60);
     }
-
-    draw_rect(dl, r, layout, vp, fill_col, border_col);
+    dl->AddText({x2 - tsz.x - 2.0f, y1 + 1.0f}, label_col, buf.data());
   }
 
   draw_axes(dl, comp, layout, vp);

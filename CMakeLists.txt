@@ -54,6 +54,7 @@ if(BUILD_GUI)
             src/svg.cpp
             src/app.cpp
             src/renderer.cpp
+            src/gpu_rect.cpp
             ${imgui_src_SOURCE_DIR}/imgui.cpp
             ${imgui_src_SOURCE_DIR}/imgui_draw.cpp
             ${imgui_src_SOURCE_DIR}/imgui_widgets.cpp
@@ -95,6 +96,7 @@ if(BUILD_GUI)
             src/svg.cpp
             src/app.cpp
             src/renderer.cpp
+            src/gpu_rect.cpp
         )
         target_include_directories(cadvis PRIVATE src)
         target_link_libraries(cadvis PRIVATE imgui::imgui glfw OpenGL::GL)
