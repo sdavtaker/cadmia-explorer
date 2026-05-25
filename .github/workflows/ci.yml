@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       PIPENV_PYTHON: python
+      PIPENV_VENV_IN_PROJECT: "1"
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -45,6 +46,7 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       PIPENV_PYTHON: python
+      PIPENV_VENV_IN_PROJECT: "1"
       VCPKG_INSTALLATION_ROOT: /usr/local/share/vcpkg
       VCPKG_FORCE_SYSTEM_BINARIES: "1"
 
