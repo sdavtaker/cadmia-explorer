@@ -1,6 +1,6 @@
-# cadmia-explorer
+# cadmia-explorer [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/sdavtaker/cadmia-explorer/badge)](https://scorecard.dev/viewer/?uri=github.com/sdavtaker/cadmia-explorer)
 
-Visualization tools for [cadpya](https://github.com/cadmia-project/cadpya) IA-DEVS simulation logs.
+Visualization tools for [cadpya](https://github.com/sdavtaker/cadpya) IA-DEVS simulation logs.
 
 ## What It Does
 
