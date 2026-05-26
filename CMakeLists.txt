@@ -44,7 +44,7 @@ if(BUILD_GUI)
         include(FetchContent)
         FetchContent_Declare(imgui_src
             GIT_REPOSITORY https://github.com/ocornut/imgui.git
-            GIT_TAG        v1.91.9)   # matches vcpkg baseline 45179168
+            GIT_TAG        97428e8ac99e339ce05eee531cf55b77b29ea709) # v1.91.9, matches vcpkg baseline 67b207f199
         FetchContent_MakeAvailable(imgui_src)
 
         add_executable(cadvis_web
