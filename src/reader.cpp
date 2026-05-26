@@ -74,6 +74,10 @@ CadvisFile read_cadvis(const std::string &path) {
     throw std::runtime_error("Read error: " + path);
   }
 
+  if (file_size < 4) {
+    throw std::runtime_error("File too small to be a .cadvis file: " + path);
+  }
+
   Reader r{buf.data(), file_size};
 
   // Header

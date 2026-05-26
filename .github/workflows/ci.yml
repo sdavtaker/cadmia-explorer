@@ -24,7 +24,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install pipenv
-        run: pip install pipenv
+        run: pip install pipenv==2023.12.1
 
       - name: Lint (ruff)
         run: pipenv install --dev && ./scripts/lint_python.sh
@@ -52,7 +52,8 @@ jobs:
           if [ ! -f "${VCPKG_INSTALLATION_ROOT}/vcpkg" ]; then
             VCPKG_INSTALLATION_ROOT="${GITHUB_WORKSPACE}/vcpkg"
             echo "VCPKG_INSTALLATION_ROOT=${VCPKG_INSTALLATION_ROOT}" >> "${GITHUB_ENV}"
-            git clone --depth 1 https://github.com/microsoft/vcpkg.git "${VCPKG_INSTALLATION_ROOT}"
+            git clone https://github.com/microsoft/vcpkg.git "${VCPKG_INSTALLATION_ROOT}"
+            git -C "${VCPKG_INSTALLATION_ROOT}" checkout 67b207f199b5d2ee09f206d2e9e9171e7c7a3274
             "${VCPKG_INSTALLATION_ROOT}/bootstrap-vcpkg.sh" -disableMetrics
           fi
 
@@ -80,7 +81,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install pipenv
-        run: pip install pipenv
+        run: pip install pipenv==2023.12.1
 
       - name: Install Python dependencies
         run: pipenv install
