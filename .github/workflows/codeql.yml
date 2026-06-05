@@ -1,0 +1,82 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '29 9 * * 1'
+
+permissions: {}
+
+jobs:
+  analyze-python:
+    name: Analyze (Python)
+    runs-on: ubuntu-24.04
+    permissions:
+      security-events: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@051e2f90686233507fe9283ff167d2e709304b30 # v3.36.0
+        with:
+          languages: python
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@051e2f90686233507fe9283ff167d2e709304b30 # v3.36.0
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@051e2f90686233507fe9283ff167d2e709304b30 # v3.36.0
+        with:
+          category: "/language:python"
+
+  analyze-cpp:
+    name: Analyze (C++)
+    runs-on: ubuntu-24.04
+    permissions:
+      security-events: write
+      contents: read
+    env:
+      VCPKG_INSTALLATION_ROOT: /usr/local/share/vcpkg
+      VCPKG_FORCE_SYSTEM_BINARIES: "1"
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@051e2f90686233507fe9283ff167d2e709304b30 # v3.36.0
+        with:
+          languages: c-cpp
+
+      - name: Bootstrap vcpkg if not pre-installed
+        run: |
+          if [ ! -f "${VCPKG_INSTALLATION_ROOT}/vcpkg" ]; then
+            VCPKG_INSTALLATION_ROOT="${GITHUB_WORKSPACE}/vcpkg"
+            echo "VCPKG_INSTALLATION_ROOT=${VCPKG_INSTALLATION_ROOT}" >> "${GITHUB_ENV}"
+            git clone https://github.com/microsoft/vcpkg.git "${VCPKG_INSTALLATION_ROOT}"
+            git -C "${VCPKG_INSTALLATION_ROOT}" checkout 67b207f199b5d2ee09f206d2e9e9171e7c7a3274
+            "${VCPKG_INSTALLATION_ROOT}/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+
+      - name: Install build tools and GL/X11 headers
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y cmake g++ libgl1-mesa-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev \
+            libxi-dev libxext-dev
+
+      - name: Build cadvis
+        run: ./scripts/build_cpp.sh
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@051e2f90686233507fe9283ff167d2e709304b30 # v3.36.0
+        with:
+          category: "/language:c-cpp"
