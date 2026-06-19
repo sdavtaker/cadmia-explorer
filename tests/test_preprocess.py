@@ -34,6 +34,12 @@ def make_skip(branch, parent_branch, step, time="[0.0, 1.0]"):
     return make_entry(branch, parent_branch, step, "", None, time, kind="skip")
 
 
+def make_dedup(branch, parent_branch, step, merged_into, time="[0.0, 1.0]"):
+    e = make_entry(branch, parent_branch, step, "", None, time, kind="dedup")
+    e["merged_into"] = merged_into
+    return e
+
+
 # ---------------------------------------------------------------------------
 # build_branch_tree
 # ---------------------------------------------------------------------------
@@ -45,7 +51,7 @@ class TestBuildBranchTree:
             make_entry("0", None, 0, "A", "[1,1]"),
             make_entry("0", None, 1, "A", "[2,2]"),
         ]
-        branch_entries, children_map, parent_map = build_branch_tree(entries)
+        branch_entries, children_map, parent_map, merge_map = build_branch_tree(entries)
         assert "0" in branch_entries
         assert len(branch_entries["0"]) == 2
         assert parent_map["0"] is None
@@ -56,7 +62,7 @@ class TestBuildBranchTree:
             make_entry("0.0", "0", 1, "A", "[2,2]"),
             make_entry("0.1", "0", 1, "B", "[3,3]"),
         ]
-        _, children_map, parent_map = build_branch_tree(entries)
+        _, children_map, parent_map, _ = build_branch_tree(entries)
         assert set(children_map["0"]) == {"0.0", "0.1"}
         assert parent_map["0.0"] == "0"
         assert parent_map["0.1"] == "0"
@@ -68,7 +74,7 @@ class TestBuildBranchTree:
             make_entry("0", None, 0, "A", "[1,1]"),
             make_entry("0", None, 1, "A", "[2,2]"),
         ]
-        branch_entries, _, _ = build_branch_tree(entries)
+        branch_entries, _, _, _ = build_branch_tree(entries)
         steps = [e["step"] for e in branch_entries["0"]]
         assert steps == [0, 1, 2]
 
@@ -79,7 +85,7 @@ class TestBuildBranchTree:
             make_entry("0.0", "0", 1, "A", "[2,2]"),
             make_entry("0.0", "0", 2, "A", "[3,3]"),
         ]
-        _, children_map, _ = build_branch_tree(entries)
+        _, children_map, _, _ = build_branch_tree(entries)
         assert children_map["0"].count("0.0") == 1
 
     def test_skip_entries_included_in_tree(self):
@@ -87,7 +93,7 @@ class TestBuildBranchTree:
             make_entry("0", None, 0, "A", "[1,1]"),
             make_skip("0.0", "0", 1),
         ]
-        branch_entries, children_map, _ = build_branch_tree(entries)
+        branch_entries, children_map, _, _ = build_branch_tree(entries)
         assert "0.0" in branch_entries
         assert "0.0" in children_map["0"]
 
@@ -145,7 +151,7 @@ class TestCollectVisibleEvents:
             make_entry("0", None, 0, "A", None),
             make_entry("0", None, 1, "A", "[1,1]"),
         ]
-        branch_entries, _, _ = build_branch_tree(entries)
+        branch_entries, _, _, _ = build_branch_tree(entries)
         rects, all_events, _ = collect_visible_events("A", branch_entries, None)
         assert len(rects) == 1
         assert len(all_events) == 1
@@ -156,7 +162,7 @@ class TestCollectVisibleEvents:
             make_entry("0.0", "0", 0, "A", "[1,1]", time="[0.5, 1.5]"),
             make_entry("0.1", "0", 0, "A", "[1,1]", time="[0.5, 1.5]"),
         ]
-        branch_entries, _, _ = build_branch_tree(entries)
+        branch_entries, _, _, _ = build_branch_tree(entries)
         rects, all_events, entry_to_rect = collect_visible_events("A", branch_entries, None)
         assert len(rects) == 1
         assert rects[0].multiplicity == 2
@@ -166,13 +172,13 @@ class TestCollectVisibleEvents:
             make_entry("0.0", "0", 0, "A", "[1,1]", time="[0.5, 1.5]"),
             make_entry("0.1", "0", 0, "A", "[2,2]", time="[0.5, 1.5]"),
         ]
-        branch_entries, _, _ = build_branch_tree(entries)
+        branch_entries, _, _, _ = build_branch_tree(entries)
         rects, _, _ = collect_visible_events("A", branch_entries, None)
         assert len(rects) == 2
 
     def test_output_mapping_applied(self):
         entries = [make_entry("0", None, 0, "A", "[j1:3, j1:3]")]
-        branch_entries, _, _ = build_branch_tree(entries)
+        branch_entries, _, _, _ = build_branch_tree(entries)
         rects, _, _ = collect_visible_events("A", branch_entries, lambda s: 42)
         assert rects[0].out_lo == 42.0
         assert rects[0].out_hi == 42.0
@@ -181,13 +187,13 @@ class TestCollectVisibleEvents:
     def test_output_mapping_preserves_label(self):
         raw = "[j2:7, j2:7]"
         entries = [make_entry("0", None, 0, "A", raw)]
-        branch_entries, _, _ = build_branch_tree(entries)
+        branch_entries, _, _, _ = build_branch_tree(entries)
         rects, _, _ = collect_visible_events("A", branch_entries, lambda s: int(s[4]))
         assert rects[0].out_label == raw
 
     def test_time_interval_parsed(self):
         entries = [make_entry("0", None, 0, "A", "[1,1]", time="[0.997, 1.005]")]
-        branch_entries, _, _ = build_branch_tree(entries)
+        branch_entries, _, _, _ = build_branch_tree(entries)
         rects, _, _ = collect_visible_events("A", branch_entries, None)
         assert rects[0].time_lo == pytest.approx(0.997)
         assert rects[0].time_hi == pytest.approx(1.005)
@@ -196,7 +202,7 @@ class TestCollectVisibleEvents:
 
     def test_open_interval_flags(self):
         entries = [make_entry("0", None, 0, "A", "[1,1]", time="[0.810, 0.950)")]
-        branch_entries, _, _ = build_branch_tree(entries)
+        branch_entries, _, _, _ = build_branch_tree(entries)
         rects, _, _ = collect_visible_events("A", branch_entries, None)
         assert rects[0].time_hi_closed is False
 
@@ -208,11 +214,13 @@ class TestCollectVisibleEvents:
 
 class TestComputeEdges:
     def _run(self, entries, component="A", map_fn=None):
-        branch_entries, _, parent_map = build_branch_tree(entries)
+        branch_entries, _, parent_map, merge_map = build_branch_tree(entries)
         rects, all_events, entry_to_rect = collect_visible_events(
             component, branch_entries, map_fn
         )
-        edges = compute_edges(component, branch_entries, parent_map, all_events, entry_to_rect)
+        edges = compute_edges(
+            component, branch_entries, parent_map, merge_map, all_events, entry_to_rect
+        )
         return rects, edges
 
     def test_sequential_edges_within_branch(self):
@@ -302,6 +310,134 @@ class TestComputeEdges:
 
 
 # ---------------------------------------------------------------------------
+# Dedup entries in build_branch_tree
+# ---------------------------------------------------------------------------
+
+
+class TestBuildBranchTreeDedup:
+    def test_dedup_branch_excluded_from_children_map(self):
+        entries = [
+            make_entry("1", None, 0, "G", "[1,1]"),
+            make_entry("2", None, 0, "G", "[1,1]"),
+            make_dedup("2", None, 0, merged_into="1"),
+        ]
+        _, children_map, _, _ = build_branch_tree(entries)
+        assert "2" not in children_map.get(None, [])
+        assert "2" not in [c for children in children_map.values() for c in children]
+
+    def test_dedup_recorded_in_merge_map(self):
+        entries = [
+            make_entry("1", None, 0, "G", "[1,1]"),
+            make_entry("2", None, 0, "G", "[1,1]"),
+            make_dedup("2", None, 0, merged_into="1"),
+        ]
+        _, _, _, merge_map = build_branch_tree(entries)
+        assert merge_map == {"2": "1"}
+
+    def test_dedup_entries_still_in_branch_entries(self):
+        entries = [
+            make_entry("1", None, 0, "G", "[1,1]"),
+            make_dedup("2", None, 0, merged_into="1"),
+        ]
+        branch_entries, _, _, _ = build_branch_tree(entries)
+        assert "2" in branch_entries
+        assert any(e["kind"] == "dedup" for e in branch_entries["2"])
+
+    def test_non_dedup_sibling_still_in_children_map(self):
+        entries = [
+            make_entry("0", None, 0, "G", "[1,1]"),
+            make_entry("1", "0", 1, "G", "[2,2]"),
+            make_entry("2", "0", 1, "G", "[2,2]"),
+            make_dedup("2", "0", 1, merged_into="1"),
+        ]
+        _, children_map, _, merge_map = build_branch_tree(entries)
+        assert "1" in children_map["0"]
+        assert "2" not in children_map["0"]
+        assert merge_map == {"2": "1"}
+
+    def test_no_merge_map_without_dedup(self):
+        entries = [
+            make_entry("0", None, 0, "G", "[1,1]"),
+            make_entry("1", "0", 1, "G", "[2,2]"),
+        ]
+        _, _, _, merge_map = build_branch_tree(entries)
+        assert merge_map == {}
+
+
+# ---------------------------------------------------------------------------
+# Merge edges in compute_edges
+# ---------------------------------------------------------------------------
+
+
+class TestComputeEdgesMerge:
+    def _run(self, entries, component="G", map_fn=None):
+        branch_entries, _, parent_map, merge_map = build_branch_tree(entries)
+        rects, all_events, entry_to_rect = collect_visible_events(
+            component, branch_entries, map_fn
+        )
+        edges = compute_edges(
+            component, branch_entries, parent_map, merge_map, all_events, entry_to_rect
+        )
+        return rects, edges
+
+    def test_merge_edge_self_loop_filtered(self):
+        # Both branches produce same rect — merge edge is a self-loop, filtered
+        entries = [
+            make_entry("1", None, 0, "G", "[1,1]", time="[1.0, 1.0]"),
+            make_entry("2", None, 0, "G", "[1,1]", time="[1.0, 1.0]"),
+            make_dedup("2", None, 0, merged_into="1"),
+            make_entry("1", None, 1, "G", "[2,2]", time="[2.0, 2.0]"),
+        ]
+        rects, edges = self._run(entries)
+        assert rects[0].multiplicity == 2
+        # Only sequential edge in branch "1" (rect 0 → rect 1); merge self-loop filtered
+        edge_pairs = {(e.from_idx, e.to_idx) for e in edges}
+        assert (0, 0) not in edge_pairs
+        assert (0, 1) in edge_pairs
+
+    def test_merge_edge_distinct_rects(self):
+        # Dedup'd branch has a different last visible event → visible merge edge
+        entries = [
+            make_entry("1", None, 0, "G", "[5,5]", time="[0.5, 0.5]"),
+            make_entry("2", None, 0, "G", "[7,7]", time="[0.7, 0.7]"),
+            make_dedup("2", None, 1, merged_into="1"),
+            make_entry("1", None, 1, "G", "[10,10]", time="[1.0, 1.0]"),
+        ]
+        rects, edges = self._run(entries)
+        assert len(rects) == 3
+        # collect_visible_events processes branches in sorted order ("1" then "2"),
+        # so: rect 0 = [5,5] (br1/step0), rect 1 = [10,10] (br1/step1), rect 2 = [7,7] (br2/step0)
+        assert rects[0].out_lo == 5.0
+        assert rects[1].out_lo == 10.0
+        assert rects[2].out_lo == 7.0
+        # Sequential in "1": rect0([5,5]) → rect1([10,10])
+        assert any(e.from_idx == 0 and e.to_idx == 1 for e in edges)
+        # Merge from "2": last-in-"2" = rect2([7,7]) → first-in-"1" = rect0([5,5])
+        assert any(e.from_idx == 2 and e.to_idx == 0 for e in edges)
+
+    def test_merge_edge_no_visible_events_in_dedup_branch(self):
+        # Dedup'd branch has no visible C events → no merge edge generated
+        entries = [
+            make_entry("1", None, 0, "G", "[1,1]", time="[1.0, 1.0]"),
+            make_dedup("2", None, 0, merged_into="1"),  # branch "2" never fired G
+            make_entry("1", None, 1, "G", "[2,2]", time="[2.0, 2.0]"),
+        ]
+        rects, edges = self._run(entries)
+        assert len(rects) == 2
+        assert len(edges) == 1  # only sequential 0→1 in branch "1"
+
+    def test_merge_edge_no_visible_events_in_surviving_branch(self):
+        # Surviving branch has no visible C events → no merge edge generated
+        entries = [
+            make_entry("2", None, 0, "G", "[1,1]", time="[1.0, 1.0]"),
+            make_dedup("2", None, 0, merged_into="1"),
+            # branch "1" exists but never fires G
+        ]
+        _, edges = self._run(entries)
+        assert len(edges) == 0
+
+
+# ---------------------------------------------------------------------------
 # End-to-end: real test logs
 # ---------------------------------------------------------------------------
 
@@ -357,6 +493,24 @@ class TestEndToEnd:
             capture_output=True, text=True,
         )
         assert result.returncode != 0
+
+    def test_dedup_log(self, tmp_path):
+        """dedup_log: two branches converge; dedup entry handled without error."""
+        import subprocess
+        import sys
+
+        result = subprocess.run(
+            [
+                sys.executable, "preprocess/preprocess.py",
+                "--log", str(TEST_LOGS / "dedup_log.jsonl"),
+                "--output", str(tmp_path / "dedup.cadvis"),
+            ],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0, result.stderr
+        assert (tmp_path / "dedup.cadvis").exists()
+        assert "1 components" in result.stdout
+        assert "G: 2 rects" in result.stdout  # [1,1] (mult 2) and [2,2]
 
     def test_job_tracker_log_with_map(self, tmp_path):
         """job_tracker_log succeeds with --map and produces 4 scorer components."""

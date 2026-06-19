@@ -66,24 +66,34 @@ def load_log(path: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def build_branch_tree(entries: list[dict]) -> tuple[
-    dict[str, list[dict]],   # branch_entries: branch_id -> [entry, ...] sorted by step
-    dict[str, list[str]],    # children_map:   branch_id -> [child_branch_id, ...]
-    dict[str, Optional[str]],# parent_map:     branch_id -> parent_branch_id | None
+    dict[str, list[dict]],    # branch_entries: branch_id -> [entry, ...] sorted by step
+    dict[str, list[str]],     # children_map:   branch_id -> [child_branch_id, ...]
+    dict[str, Optional[str]], # parent_map:     branch_id -> parent_branch_id | None
+    dict[str, str],           # merge_map:      dedup'd branch_id -> surviving branch_id
 ]:
-    branch_entries: dict[str, list[dict]] = defaultdict(list)
-    children_map:   dict[str, list[str]] = defaultdict(list)
-    parent_map:     dict[str, Optional[str]] = {}
+    # First pass: identify dedup'd branches so we can exclude them from children_map.
+    # A dedup'd branch's future is subsumed by the surviving branch; it must not
+    # appear as a regular child because the edge algorithm handles it separately.
+    merge_map: dict[str, str] = {}
+    for entry in entries:
+        if entry.get('kind') == 'dedup':
+            merge_map[entry['branch']] = entry['merged_into']
 
-    seen_children: dict[str, set[str]] = defaultdict(set)
+    branch_entries: dict[str, list[dict]] = defaultdict(list)
+    children_map:   dict[str, list[str]]  = defaultdict(list)
+    parent_map:     dict[str, Optional[str]] = {}
+    seen_children:  dict[str, set[str]]   = defaultdict(set)
 
     for entry in entries:
-        branch_id  = entry['branch']
-        parent_id  = entry['parent_branch']
+        branch_id = entry['branch']
+        parent_id = entry['parent_branch']
 
         branch_entries[branch_id].append(entry)
         parent_map[branch_id] = parent_id
 
-        if parent_id is not None and branch_id not in seen_children[parent_id]:
+        if (parent_id is not None
+                and branch_id not in merge_map
+                and branch_id not in seen_children[parent_id]):
             children_map[parent_id].append(branch_id)
             seen_children[parent_id].add(branch_id)
 
@@ -91,7 +101,7 @@ def build_branch_tree(entries: list[dict]) -> tuple[
     for branch_id in branch_entries:
         branch_entries[branch_id].sort(key=lambda e: e['step'])
 
-    return dict(branch_entries), dict(children_map), parent_map
+    return dict(branch_entries), dict(children_map), parent_map, merge_map
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +212,7 @@ def compute_edges(
     component: str,
     branch_entries: dict[str, list[dict]],
     parent_map: dict[str, Optional[str]],
+    merge_map: dict[str, str],
     all_events: list[dict],
     entry_to_rect: dict[int, int],
 ) -> list[EdgeRecord]:
@@ -212,6 +223,8 @@ def compute_edges(
     - Sequential edges: consecutive visible events within the same branch.
     - Fan-out edges: last visible event in an ancestor branch → first visible event
       in the current branch (traversing up through null-output branches).
+    - Merge edges: last visible event in a dedup'd branch → first visible event in
+      the surviving branch (stored as regular EdgeRecord; no format distinction).
     - Self-loops (same rect index) are filtered out.
     - Duplicate edges are deduplicated.
     """
@@ -254,6 +267,18 @@ def compute_edges(
             if ancestor_rect != first_rect:
                 edges.add((ancestor_rect, first_rect))
 
+    # Merge edges: last visible C event in each dedup'd branch → first visible C
+    # event in the surviving branch (treated as regular edges; self-loops filtered).
+    for dedup_id, surviving_id in merge_map.items():
+        dedup_pairs   = branch_c_visible.get(dedup_id)
+        surviving_pairs = branch_c_visible.get(surviving_id)
+        if not dedup_pairs or not surviving_pairs:
+            continue
+        last_dedup_rect    = entry_to_rect[dedup_pairs[-1][0]]
+        first_surviving_rect = entry_to_rect[surviving_pairs[0][0]]
+        if last_dedup_rect != first_surviving_rect:
+            edges.add((last_dedup_rect, first_surviving_rect))
+
     return [EdgeRecord(from_idx=a, to_idx=b) for a, b in sorted(edges)]
 
 
@@ -285,7 +310,7 @@ def main() -> None:
     print(f"  {len(entries)} entries")
 
     # Build branch tree
-    branch_entries, children_map, parent_map = build_branch_tree(entries)
+    branch_entries, children_map, parent_map, merge_map = build_branch_tree(entries)
     print(f"  {len(branch_entries)} branches")
 
     # Discover components
@@ -299,7 +324,7 @@ def main() -> None:
             comp_name, branch_entries, map_fn
         )
         edges = compute_edges(
-            comp_name, branch_entries, parent_map, all_events, entry_to_rect
+            comp_name, branch_entries, parent_map, merge_map, all_events, entry_to_rect
         )
         comp = ComponentRecord(name=comp_name, rects=rects, edges=edges)
         writer.add_component(comp)

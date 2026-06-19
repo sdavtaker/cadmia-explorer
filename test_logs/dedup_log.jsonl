@@ -1,0 +1,4 @@
+{"branch": "1", "parent_branch": null, "step": 0, "component": "G", "kind": "atomic", "output": "[1,1]", "time": "[1.0, 1.0]"}
+{"branch": "2", "parent_branch": null, "step": 0, "component": "G", "kind": "atomic", "output": "[1,1]", "time": "[1.0, 1.0]"}
+{"branch": "2", "parent_branch": null, "step": 0, "component": "", "kind": "dedup", "output": null, "time": "[1.0, 1.0]", "merged_into": "1"}
+{"branch": "1", "parent_branch": null, "step": 1, "component": "G", "kind": "atomic", "output": "[2,2]", "time": "[2.0, 2.0]"}
