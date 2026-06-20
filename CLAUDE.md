@@ -61,9 +61,10 @@ Time intervals always numeric. Output intervals numeric unless user provides `--
 
 ### Branch Tree
 
-Branch IDs are dot-separated strings: `"0"`, `"0.0"`, `"0.1"`, `"0.0.1"`, etc.
+Branch IDs are monotonic integers as strings: `"0"` (root), `"1"`, `"2"`, etc.
 The root branch `"0"` may not appear in the log if branching happens immediately.
 Every non-root branch ID is guaranteed to appear in the log.
+Dedup entries (`kind: "dedup"`) carry a `merged_into` field and are excluded from the active branch tree.
 
 ### Binary Format
 
@@ -75,7 +76,8 @@ It is an internal format — not intended for human consumption.
 For component C's plot, edges connect visible (non-null) C events in the branch tree:
 - **Sequential**: consecutive C-visible events within the same branch
 - **Fan-out**: last C-visible event in a branch → first C-visible event in each child branch
-- Traverses transparently through null-output, other-component, and skip entries
+- **Merge**: last C-visible event in a dedup'd branch → first C-visible event in the surviving branch
+- Traverses transparently through null-output, other-component, skip, and dedup entries
 - Self-loops (from multiplicity merging) are filtered out
 
 ### SVG Conventions
