@@ -109,13 +109,16 @@ Skip branch example (from the counter simulation):
 
 **Step 8** (branching): FastGen and SlowGen have overlapping but non-punctual `t_next` intervals. The limit `[0.810, 0.950)` is strictly inside FastGen's `t_next`, so a skip branch `"6"` is created alongside the FireFastGen branch `"5"`. The skip branch records that no component fired in `[0.810, 0.950)` — SlowGen might fire instead at the next step.
 
-Dedup example:
+Dedup example (two independent identical generators G1, G2, both imminent at t=1):
 
 ```jsonl
-{"branch": "1", "parent_branch": null, "step": 0, "component": "G", "kind": "atomic", "output": "[1,1]", "time": "[1.0, 1.0]"}
-{"branch": "2", "parent_branch": null, "step": 0, "component": "G", "kind": "atomic", "output": "[1,1]", "time": "[1.0, 1.0]"}
-{"branch": "2", "parent_branch": null, "step": 0, "component": "", "kind": "dedup", "output": null, "time": "[1.0, 1.0]", "merged_into": "1"}
-{"branch": "1", "parent_branch": null, "step": 1, "component": "G", "kind": "atomic", "output": "[2,2]", "time": "[2.0, 2.0]"}
+{"branch": "1", "parent_branch": "0", "step": 0, "component": "G1", "kind": "atomic", "output": null, "time": "[1.0, 1.0]"}
+{"branch": "2", "parent_branch": "0", "step": 0, "component": "G2", "kind": "atomic", "output": null, "time": "[1.0, 1.0]"}
+{"branch": "3", "parent_branch": "1", "step": 1, "component": "G2", "kind": "atomic", "output": null, "time": "[1.0, 1.0]"}
+{"branch": "4", "parent_branch": "2", "step": 1, "component": "G1", "kind": "atomic", "output": null, "time": "[1.0, 1.0]"}
+{"branch": "4", "parent_branch": "2", "step": 1, "component": "", "kind": "dedup", "output": null, "time": "[1.0, 1.0]", "merged_into": "3"}
 ```
 
-**Dedup**: Branches `"1"` and `"2"` both produced the same output and reached the same state. At the next BFS iteration, branch `"2"` is detected as structurally equal to head `"1"` and logged as `kind: "dedup"` with `merged_into: "1"`. Only branch `"1"` continues.
+**Step 0**: G1 and G2 are simultaneously imminent at t=`[1,1]`. SELECT is uncertain → BFS forks into branch `"1"` (G1 fires first) and branch `"2"` (G2 fires first).
+
+**Step 1**: In branch `"1"`, G2 still needs to fire (creating child branch `"3"`). In branch `"2"`, G1 still needs to fire (creating child branch `"4"`). After both generators have fired in each path, branches `"3"` and `"4"` are in identical state — G1 and G2 are independent, so the firing order doesn't matter. Branch `"4"` is detected as structurally equal to head `"3"` and logged as `kind: "dedup"` with `merged_into: "3"`. Only branch `"3"` continues.
