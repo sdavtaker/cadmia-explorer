@@ -32,7 +32,7 @@ jobs:
         uses: github/codeql-action/autobuild@03e4368ac7daa2bd82b3e85262f3bf87ee112f57 # v3.36.0
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@051e2f90686233507fe9283ff167d2e709304b30 # v3.36.0
+        uses: github/codeql-action/analyze@03e4368ac7daa2bd82b3e85262f3bf87ee112f57 # v3.36.0
         with:
           category: "/language:python"
 
@@ -77,6 +77,6 @@ jobs:
         run: ./scripts/build_cpp.sh
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@051e2f90686233507fe9283ff167d2e709304b30 # v3.36.0
+        uses: github/codeql-action/analyze@03e4368ac7daa2bd82b3e85262f3bf87ee112f57 # v3.36.0
         with:
           category: "/language:c-cpp"
