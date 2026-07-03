@@ -7,6 +7,14 @@
 
 namespace {
 
+// Hard resource caps — prevent RAM exhaustion from crafted files.
+constexpr size_t MAX_FILE_SIZE = 256ULL * 1024 * 1024; // 256 MB
+constexpr uint32_t MAX_COMPONENTS = 1'000'000;
+constexpr uint32_t MAX_STRINGS = 1'000'000;
+constexpr uint32_t MAX_STRING_LEN = 65'536; // 64 KB
+constexpr uint32_t MAX_RECTS = 1'000'000;
+constexpr uint32_t MAX_EDGES = 1'000'000;
+
 // Little-endian reads from a raw buffer with bounds checking.
 struct Reader {
   const uint8_t *data;
@@ -77,6 +85,9 @@ CadvisFile read_cadvis(const std::string &path) {
   if (file_size < 4) {
     throw std::runtime_error("File too small to be a .cadvis file: " + path);
   }
+  if (file_size > MAX_FILE_SIZE) {
+    throw std::runtime_error("File exceeds maximum allowed size: " + path);
+  }
 
   Reader r{buf.data(), file_size};
 
@@ -94,12 +105,21 @@ CadvisFile read_cadvis(const std::string &path) {
   }
   r.u16(); // flags
   uint32_t n_components = r.u32();
+  if (n_components > MAX_COMPONENTS) {
+    throw std::runtime_error("Component count exceeds limit: " + std::to_string(n_components));
+  }
 
   // String pool
   uint32_t n_strings = r.u32();
+  if (n_strings > MAX_STRINGS) {
+    throw std::runtime_error("String pool size exceeds limit: " + std::to_string(n_strings));
+  }
   std::vector<std::string> pool(n_strings);
   for (uint32_t i = 0; i < n_strings; ++i) {
     uint32_t len = r.u32();
+    if (len > MAX_STRING_LEN) {
+      throw std::runtime_error("String length exceeds limit: " + std::to_string(len));
+    }
     pool[i] = r.str(len);
   }
 
@@ -110,7 +130,13 @@ CadvisFile read_cadvis(const std::string &path) {
   for (uint32_t ci = 0; ci < n_components; ++ci) {
     uint32_t name_idx = r.u32();
     uint32_t n_rects = r.u32();
+    if (n_rects > MAX_RECTS) {
+      throw std::runtime_error("Rect count exceeds limit: " + std::to_string(n_rects));
+    }
     uint32_t n_edges = r.u32();
+    if (n_edges > MAX_EDGES) {
+      throw std::runtime_error("Edge count exceeds limit: " + std::to_string(n_edges));
+    }
 
     Component &comp = result.components[ci];
     comp.name = pool.at(name_idx);
