@@ -69,24 +69,30 @@ struct Reader {
 } // namespace
 
 CadvisFile read_cadvis(const std::string &path) {
-  // Read entire file into memory
+  // Determine file size and enforce caps before allocating/reading anything.
   std::ifstream f(path, std::ios::binary | std::ios::ate);
   if (!f) {
     throw std::runtime_error("Cannot open: " + path);
   }
-  auto file_size = static_cast<size_t>(f.tellg());
-  f.seekg(0);
-  std::vector<uint8_t> buf(file_size);
-  f.read(reinterpret_cast<char *>(buf.data()), static_cast<std::streamsize>(file_size));
-  if (!f) {
-    throw std::runtime_error("Read error: " + path);
+  auto tell = f.tellg();
+  if (tell < 0) {
+    throw std::runtime_error("Cannot determine file size: " + path);
   }
+  auto file_size = static_cast<size_t>(tell);
 
   if (file_size < 4) {
     throw std::runtime_error("File too small to be a .cadvis file: " + path);
   }
   if (file_size > MAX_FILE_SIZE) {
     throw std::runtime_error("File exceeds maximum allowed size: " + path);
+  }
+
+  // Read entire file into memory
+  f.seekg(0);
+  std::vector<uint8_t> buf(file_size);
+  f.read(reinterpret_cast<char *>(buf.data()), static_cast<std::streamsize>(file_size));
+  if (!f) {
+    throw std::runtime_error("Read error: " + path);
   }
 
   Reader r{buf.data(), file_size};
