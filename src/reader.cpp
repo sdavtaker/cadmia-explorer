@@ -34,6 +34,18 @@ struct Reader {
     }
   }
 
+  size_t remaining() const { return size - pos; }
+
+  // Reject counts that claim more entries than the file could possibly still
+  // contain, before allocating storage for them. Without this, a truncated
+  // file can still force allocation up to the relevant cap before need()
+  // throws on the first actual read.
+  void require_remaining(size_t n, const char *what) const {
+    if (remaining() < n) {
+      throw std::runtime_error(std::string("Truncated .cadvis file: not enough data for ") + what);
+    }
+  }
+
   uint8_t u8() {
     need(1);
     return data[pos++];
@@ -127,6 +139,7 @@ CadvisFile read_cadvis(const std::string &path) {
   if (n_strings > MAX_STRINGS) {
     throw std::runtime_error("String pool size exceeds limit: " + std::to_string(n_strings));
   }
+  r.require_remaining(static_cast<size_t>(n_strings) * 4, "the declared string pool");
   std::vector<std::string> pool(n_strings);
   for (uint32_t i = 0; i < n_strings; ++i) {
     uint32_t len = r.u32();
@@ -137,6 +150,7 @@ CadvisFile read_cadvis(const std::string &path) {
   }
 
   // Components
+  r.require_remaining(static_cast<size_t>(n_components) * 12, "the declared component list");
   CadvisFile result;
   result.components.resize(n_components);
 
@@ -164,6 +178,9 @@ CadvisFile read_cadvis(const std::string &path) {
     if (n_edges > MAX_EDGES) {
       throw std::runtime_error("Edge count exceeds limit: " + std::to_string(n_edges));
     }
+
+    r.require_remaining(static_cast<size_t>(n_rects) * 48 + static_cast<size_t>(n_edges) * 8,
+                        "this component's declared rects and edges");
 
     Component &comp = result.components[ci];
     comp.name = resolve_label(name_idx);

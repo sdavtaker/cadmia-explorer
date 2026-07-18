@@ -7,6 +7,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
 #include <fstream>
+#include <system_error>
 
 using Catch::Approx;
 
@@ -340,8 +341,24 @@ std::vector<uint8_t> make_header(uint32_t n_components, uint32_t n_strings) {
   return buf;
 }
 
-// Write buffer to a temp file and return the path.  Caller must delete.
-std::string write_tmp(const std::vector<uint8_t> &buf) {
+// Owns a temp file path and removes it on destruction, so a failed REQUIRE
+// (which aborts the test via exception) can't leak the file on disk.
+struct TempFile {
+  std::string path;
+  explicit TempFile(std::string p) : path(std::move(p)) {}
+  TempFile(const TempFile &) = delete;
+  TempFile &operator=(const TempFile &) = delete;
+  TempFile(TempFile &&) = default;
+  TempFile &operator=(TempFile &&) = default;
+  ~TempFile() {
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
+  }
+  operator const std::string &() const { return path; }
+};
+
+// Write buffer to a temp file and return an owning handle to the path.
+TempFile write_tmp(const std::vector<uint8_t> &buf) {
   static std::atomic<int> counter{0};
   auto path = (std::filesystem::temp_directory_path() /
                ("cadvis_test_" + std::to_string(++counter) + ".cadvis"))
@@ -350,14 +367,14 @@ std::string write_tmp(const std::vector<uint8_t> &buf) {
   REQUIRE(f.is_open());
   f.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
   REQUIRE(f.good());
-  return path;
+  return TempFile(path);
 }
 
 // Create a sparse file with the given logical size, without physically
 // writing that many bytes to disk. std::ifstream::tellg() (what read_cadvis
 // uses to enforce MAX_FILE_SIZE) reports the logical size regardless of how
 // the file is backed on disk, so this exercises the size-cap branch cheaply.
-std::string write_sparse_tmp(size_t size) {
+TempFile write_sparse_tmp(size_t size) {
   REQUIRE(size > 0);
   static std::atomic<int> counter{0};
   auto path = (std::filesystem::temp_directory_path() /
@@ -369,7 +386,7 @@ std::string write_sparse_tmp(size_t size) {
   REQUIRE(f.good());
   f.put('\0');
   REQUIRE(f.good());
-  return path;
+  return TempFile(path);
 }
 
 } // namespace
@@ -378,7 +395,6 @@ TEST_CASE("read_cadvis: rejects file exceeding size limit") {
   constexpr size_t MAX_FILE_SIZE = 256ULL * 1024 * 1024;
   auto path = write_sparse_tmp(MAX_FILE_SIZE + 1);
   REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
-  std::filesystem::remove(path);
 }
 
 TEST_CASE("read_cadvis: accepts a minimal valid file") {
@@ -386,7 +402,6 @@ TEST_CASE("read_cadvis: accepts a minimal valid file") {
   auto buf = make_header(0, 0);
   auto path = write_tmp(buf);
   REQUIRE_NOTHROW(read_cadvis(path));
-  std::filesystem::remove(path);
 }
 
 TEST_CASE("read_cadvis: rejects component count above limit") {
@@ -395,7 +410,6 @@ TEST_CASE("read_cadvis: rejects component count above limit") {
   auto buf = make_header(over, 0); // n_strings = 0 so string pool is empty
   auto path = write_tmp(buf);
   REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
-  std::filesystem::remove(path);
 }
 
 TEST_CASE("read_cadvis: rejects string pool size above limit") {
@@ -404,7 +418,6 @@ TEST_CASE("read_cadvis: rejects string pool size above limit") {
   auto buf = make_header(0, over);
   auto path = write_tmp(buf);
   REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
-  std::filesystem::remove(path);
 }
 
 TEST_CASE("read_cadvis: rejects individual string length above limit") {
@@ -414,7 +427,6 @@ TEST_CASE("read_cadvis: rejects individual string length above limit") {
   write_u32(buf, over_len); // string length field
   auto path = write_tmp(buf);
   REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
-  std::filesystem::remove(path);
 }
 
 TEST_CASE("read_cadvis: rejects rect count above limit per component") {
@@ -428,7 +440,6 @@ TEST_CASE("read_cadvis: rejects rect count above limit per component") {
   write_u32(buf, over); // n_rects
   auto path = write_tmp(buf);
   REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
-  std::filesystem::remove(path);
 }
 
 TEST_CASE("read_cadvis: rejects total label bytes above limit even when every "
@@ -463,7 +474,6 @@ TEST_CASE("read_cadvis: rejects total label bytes above limit even when every "
   }
   auto path = write_tmp(buf);
   REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
-  std::filesystem::remove(path);
 }
 
 TEST_CASE("read_cadvis: rejects edge count above limit per component") {
@@ -477,5 +487,4 @@ TEST_CASE("read_cadvis: rejects edge count above limit per component") {
   write_u32(buf, over); // n_edges
   auto path = write_tmp(buf);
   REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
-  std::filesystem::remove(path);
 }
