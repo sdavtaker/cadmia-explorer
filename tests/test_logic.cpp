@@ -347,7 +347,9 @@ std::string write_tmp(const std::vector<uint8_t> &buf) {
                ("cadvis_test_" + std::to_string(++counter) + ".cadvis"))
                   .string();
   std::ofstream f(path, std::ios::binary);
+  REQUIRE(f.is_open());
   f.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
+  REQUIRE(f.good());
   return path;
 }
 
@@ -356,20 +358,24 @@ std::string write_tmp(const std::vector<uint8_t> &buf) {
 // uses to enforce MAX_FILE_SIZE) reports the logical size regardless of how
 // the file is backed on disk, so this exercises the size-cap branch cheaply.
 std::string write_sparse_tmp(size_t size) {
+  REQUIRE(size > 0);
   static std::atomic<int> counter{0};
   auto path = (std::filesystem::temp_directory_path() /
                ("cadvis_test_sparse_" + std::to_string(++counter) + ".cadvis"))
                   .string();
   std::ofstream f(path, std::ios::binary);
+  REQUIRE(f.is_open());
   f.seekp(static_cast<std::streamoff>(size - 1));
+  REQUIRE(f.good());
   f.put('\0');
+  REQUIRE(f.good());
   return path;
 }
 
 } // namespace
 
 TEST_CASE("read_cadvis: rejects file exceeding size limit") {
-  constexpr uint64_t MAX_FILE_SIZE = 256ULL * 1024 * 1024;
+  constexpr size_t MAX_FILE_SIZE = 256ULL * 1024 * 1024;
   auto path = write_sparse_tmp(MAX_FILE_SIZE + 1);
   REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
   std::filesystem::remove(path);
@@ -420,6 +426,41 @@ TEST_CASE("read_cadvis: rejects rect count above limit per component") {
   write_u32(buf, 0); // name_idx = 0
   constexpr uint32_t over = 1'000'001;
   write_u32(buf, over); // n_rects
+  auto path = write_tmp(buf);
+  REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
+  std::filesystem::remove(path);
+}
+
+TEST_CASE("read_cadvis: rejects total label bytes above limit even when every "
+          "per-field cap is individually satisfied") {
+  // A single pool string at the max per-string length (64KB), referenced by
+  // enough rects that the running total-label-bytes budget (256MB) is
+  // exceeded, well before rect count, component count, or file size come
+  // anywhere near their own individual caps.
+  constexpr uint32_t big_len = 65'536;
+  constexpr uint32_t n_rects = 4'100; // 4100 * 64KB ~= 256.25MB > 256MB cap
+  auto buf = make_header(1, 1);
+  write_u32(buf, big_len); // pool[0].len
+  buf.insert(buf.end(), big_len, 'x');
+  write_u32(buf, 0);       // name_idx = 0 (also charged against the budget)
+  write_u32(buf, n_rects); // n_rects
+  write_u32(buf, 0);       // n_edges = 0
+  for (uint32_t i = 0; i < n_rects; ++i) {
+    write_u32(buf, 0); // time_lo (dummy bit pattern, value unchecked)
+    write_u32(buf, 0);
+    write_u32(buf, 0); // time_hi
+    write_u32(buf, 0);
+    write_u32(buf, 0); // out_lo
+    write_u32(buf, 0);
+    write_u32(buf, 0); // out_hi
+    write_u32(buf, 0);
+    write_u32(buf, 0); // label_idx -> pool[0], the 64KB string
+    write_u32(buf, 1); // multiplicity
+    buf.push_back(0);  // flags
+    for (int p = 0; p < 7; ++p) {
+      buf.push_back(0); // padding
+    }
+  }
   auto path = write_tmp(buf);
   REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
   std::filesystem::remove(path);

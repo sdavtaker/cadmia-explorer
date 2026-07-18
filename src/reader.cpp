@@ -9,11 +9,18 @@ namespace {
 
 // Hard resource caps — prevent RAM exhaustion from crafted files.
 constexpr size_t MAX_FILE_SIZE = 256ULL * 1024 * 1024; // 256 MB
+constexpr size_t MIN_HEADER_SIZE =
+    16; // magic(4) + version(2) + flags(2) + n_components(4) + n_strings(4)
 constexpr uint32_t MAX_COMPONENTS = 1'000'000;
 constexpr uint32_t MAX_STRINGS = 1'000'000;
 constexpr uint32_t MAX_STRING_LEN = 65'536; // 64 KB
 constexpr uint32_t MAX_RECTS = 1'000'000;
 constexpr uint32_t MAX_EDGES = 1'000'000;
+// A rect/component can reference the same pool string via a 4-byte index, so
+// bounding each string's length and the pool's element count isn't enough —
+// a small file can still re-copy a large pool string into millions of rects.
+// Cap the total bytes materialized this way across the whole file.
+constexpr size_t MAX_TOTAL_LABEL_BYTES = 256ULL * 1024 * 1024; // 256 MB
 
 // Little-endian reads from a raw buffer with bounds checking.
 struct Reader {
@@ -80,7 +87,7 @@ CadvisFile read_cadvis(const std::string &path) {
   }
   auto file_size = static_cast<size_t>(tell);
 
-  if (file_size < 4) {
+  if (file_size < MIN_HEADER_SIZE) {
     throw std::runtime_error("File too small to be a .cadvis file: " + path);
   }
   if (file_size > MAX_FILE_SIZE) {
@@ -133,6 +140,20 @@ CadvisFile read_cadvis(const std::string &path) {
   CadvisFile result;
   result.components.resize(n_components);
 
+  // A pool string can be referenced by index from any number of components/
+  // rects; without a running total, a small file could re-copy one large
+  // string millions of times and exhaust RAM despite every per-field cap
+  // above being satisfied.
+  size_t total_label_bytes = 0;
+  auto resolve_label = [&](uint32_t idx) -> const std::string & {
+    const std::string &s = pool.at(idx);
+    total_label_bytes += s.size();
+    if (total_label_bytes > MAX_TOTAL_LABEL_BYTES) {
+      throw std::runtime_error("Total label data exceeds limit");
+    }
+    return s;
+  };
+
   for (uint32_t ci = 0; ci < n_components; ++ci) {
     uint32_t name_idx = r.u32();
     uint32_t n_rects = r.u32();
@@ -145,7 +166,7 @@ CadvisFile read_cadvis(const std::string &path) {
     }
 
     Component &comp = result.components[ci];
-    comp.name = pool.at(name_idx);
+    comp.name = resolve_label(name_idx);
     comp.rects.resize(n_rects);
     comp.edges.resize(n_edges);
 
@@ -163,7 +184,7 @@ CadvisFile read_cadvis(const std::string &path) {
       rect.time_hi_closed = (flags & 2) != 0;
       rect.out_lo_closed = (flags & 4) != 0;
       rect.out_hi_closed = (flags & 8) != 0;
-      rect.out_label = pool.at(label_idx);
+      rect.out_label = resolve_label(label_idx);
     }
 
     for (uint32_t ei = 0; ei < n_edges; ++ei) {
