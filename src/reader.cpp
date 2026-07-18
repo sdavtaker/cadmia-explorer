@@ -20,7 +20,7 @@ constexpr uint32_t MAX_EDGES = 1'000'000;
 // bounding each string's length and the pool's element count isn't enough —
 // a small file can still re-copy a large pool string into millions of rects.
 // Cap the total bytes materialized this way across the whole file.
-constexpr size_t MAX_TOTAL_LABEL_BYTES = 256ULL * 1024 * 1024; // 256 MB
+constexpr uint64_t MAX_TOTAL_LABEL_BYTES = 256ULL * 1024 * 1024; // 256 MB
 
 // Little-endian reads from a raw buffer with bounds checking.
 struct Reader {
@@ -157,8 +157,10 @@ CadvisFile read_cadvis(const std::string &path) {
   // A pool string can be referenced by index from any number of components/
   // rects; without a running total, a small file could re-copy one large
   // string millions of times and exhaust RAM despite every per-field cap
-  // above being satisfied.
-  size_t total_label_bytes = 0;
+  // above being satisfied. uint64_t (not size_t) so the accumulator can't
+  // wrap on 32-bit targets before it reaches the 256MB cap below: the file
+  // size cap alone permits well over 4GB of accumulated label bytes.
+  uint64_t total_label_bytes = 0;
   auto resolve_label = [&](uint32_t idx) -> const std::string & {
     if (idx >= pool.size()) {
       throw std::runtime_error("Label index out of range: " + std::to_string(idx));
