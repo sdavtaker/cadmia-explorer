@@ -356,20 +356,31 @@ std::string write_tmp(const std::vector<uint8_t> &buf) {
   return path;
 }
 
+// Create a sparse file with the given logical size, without physically
+// writing that many bytes to disk. std::ifstream::tellg() (what read_cadvis
+// uses to enforce MAX_FILE_SIZE) reports the logical size regardless of how
+// the file is backed on disk, so this exercises the size-cap branch cheaply.
+std::string write_sparse_tmp(size_t size) {
+  static std::atomic<int> counter{0};
+  auto path = (std::filesystem::temp_directory_path() /
+               ("cadvis_test_sparse_" + std::to_string(++counter) + ".cadvis"))
+                  .string();
+  std::ofstream f(path, std::ios::binary);
+  f.seekp(static_cast<std::streamoff>(size - 1));
+  f.put('\0');
+  return path;
+}
+
 } // namespace
 
 TEST_CASE("read_cadvis: rejects file exceeding size limit") {
-  // Build a minimal valid header but then claim n_strings = 0, n_components = 0
-  // so the file is structurally "complete" but tiny — we test the cap via a
-  // mock that claims to be huge via file size. Instead, simulate the cap by
-  // writing a valid tiny file and confirming it loads, then trust the cap
-  // constant is checked before allocation (white-box: we added that check).
-  //
-  // For the oversized case we cannot literally write 256 MB in a unit test, so
-  // we verify the cap is enforced by writing a known-good file and confirming
-  // the success path still works (regression guard), then rely on the code
-  // inspection for the file-size branch.
+  constexpr uint64_t MAX_FILE_SIZE = 256ULL * 1024 * 1024;
+  auto path = write_sparse_tmp(MAX_FILE_SIZE + 1);
+  REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
+  std::filesystem::remove(path);
+}
 
+TEST_CASE("read_cadvis: accepts a minimal valid file") {
   // Happy path: a complete zero-component zero-string file loads without error.
   auto buf = make_header(0, 0);
   auto path = write_tmp(buf);
