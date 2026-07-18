@@ -488,3 +488,16 @@ TEST_CASE("read_cadvis: rejects edge count above limit per component") {
   auto path = write_tmp(buf);
   REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
 }
+
+TEST_CASE("read_cadvis: rejects out-of-range label index as std::runtime_error") {
+  // One component with an empty string pool (n_strings = 0) whose name_idx
+  // points past the (empty) pool; resolve_label must reject this itself
+  // rather than let std::vector::at() throw std::out_of_range, which would
+  // violate read_cadvis's documented std::runtime_error-only contract.
+  auto buf = make_header(1, 0);
+  write_u32(buf, 0); // name_idx = 0, but pool is empty
+  write_u32(buf, 0); // n_rects = 0
+  write_u32(buf, 0); // n_edges = 0
+  auto path = write_tmp(buf);
+  REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
+}

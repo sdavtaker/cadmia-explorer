@@ -160,7 +160,10 @@ CadvisFile read_cadvis(const std::string &path) {
   // above being satisfied.
   size_t total_label_bytes = 0;
   auto resolve_label = [&](uint32_t idx) -> const std::string & {
-    const std::string &s = pool.at(idx);
+    if (idx >= pool.size()) {
+      throw std::runtime_error("Label index out of range: " + std::to_string(idx));
+    }
+    const std::string &s = pool[idx];
     total_label_bytes += s.size();
     if (total_label_bytes > MAX_TOTAL_LABEL_BYTES) {
       throw std::runtime_error("Total label data exceeds limit");
