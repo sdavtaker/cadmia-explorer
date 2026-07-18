@@ -360,14 +360,16 @@ struct TempFile {
 // Write buffer to a temp file and return an owning handle to the path.
 TempFile write_tmp(const std::vector<uint8_t> &buf) {
   static std::atomic<int> counter{0};
-  auto path = (std::filesystem::temp_directory_path() /
-               ("cadvis_test_" + std::to_string(++counter) + ".cadvis"))
-                  .string();
-  std::ofstream f(path, std::ios::binary);
+  // Constructed before any I/O so its destructor covers every REQUIRE below:
+  // once the file exists on disk, a failing REQUIRE must not skip cleanup.
+  TempFile tmp((std::filesystem::temp_directory_path() /
+                ("cadvis_test_" + std::to_string(++counter) + ".cadvis"))
+                   .string());
+  std::ofstream f(tmp.path, std::ios::binary);
   REQUIRE(f.is_open());
   f.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
   REQUIRE(f.good());
-  return TempFile(path);
+  return tmp;
 }
 
 // Create a sparse file with the given logical size, without physically
@@ -377,16 +379,16 @@ TempFile write_tmp(const std::vector<uint8_t> &buf) {
 TempFile write_sparse_tmp(size_t size) {
   REQUIRE(size > 0);
   static std::atomic<int> counter{0};
-  auto path = (std::filesystem::temp_directory_path() /
-               ("cadvis_test_sparse_" + std::to_string(++counter) + ".cadvis"))
-                  .string();
-  std::ofstream f(path, std::ios::binary);
+  TempFile tmp((std::filesystem::temp_directory_path() /
+                ("cadvis_test_sparse_" + std::to_string(++counter) + ".cadvis"))
+                   .string());
+  std::ofstream f(tmp.path, std::ios::binary);
   REQUIRE(f.is_open());
   f.seekp(static_cast<std::streamoff>(size - 1));
   REQUIRE(f.good());
   f.put('\0');
   REQUIRE(f.good());
-  return TempFile(path);
+  return tmp;
 }
 
 } // namespace
