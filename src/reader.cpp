@@ -1,11 +1,19 @@
 #include "reader.h"
 #include <array>
+#include <bit>
 #include <cstring>
 #include <fstream>
 #include <stdexcept>
 #include <vector>
 
 namespace {
+
+// The .cadvis format is little-endian (the Python writer packs with "<...").
+// Reader::u16/u32/f64 decode via memcpy into native types, which only matches
+// the file format on a little-endian host. Fail the build rather than
+// silently misinterpret header/count fields on a big-endian target.
+static_assert(std::endian::native == std::endian::little,
+              "reader.cpp assumes a little-endian host to match the .cadvis file format");
 
 // Hard resource caps — prevent RAM exhaustion from crafted files.
 constexpr size_t MAX_FILE_SIZE = 256ULL * 1024 * 1024; // 256 MB
