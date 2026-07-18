@@ -2,8 +2,12 @@
 #include "logic.h"
 #include "reader.h"
 
+#include <atomic>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <filesystem>
+#include <fstream>
+#include <system_error>
 
 using Catch::Approx;
 
@@ -302,4 +306,200 @@ TEST_CASE("Layout adds 5% time padding and 10% output padding") {
   // 10% of span=10 = 1.0 padding each side
   REQUIRE(layout.y_min == Approx(-1.0).epsilon(1e-9));
   REQUIRE(layout.y_max == Approx(11.0).epsilon(1e-9));
+}
+
+// ---------------------------------------------------------------------------
+// read_cadvis resource cap tests
+// ---------------------------------------------------------------------------
+// Helpers for building crafted .cadvis buffers in memory.
+
+namespace {
+
+void write_u16(std::vector<uint8_t> &buf, uint16_t v) {
+  buf.push_back(static_cast<uint8_t>(v & 0xFF));
+  buf.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
+}
+
+void write_u32(std::vector<uint8_t> &buf, uint32_t v) {
+  for (int i = 0; i < 4; ++i) {
+    buf.push_back(static_cast<uint8_t>((v >> (8 * i)) & 0xFF));
+  }
+}
+
+// Minimal valid header: magic + version=1 + flags=0 + n_components + n_strings.
+// Caller can append more bytes or truncate as needed.
+std::vector<uint8_t> make_header(uint32_t n_components, uint32_t n_strings) {
+  std::vector<uint8_t> buf;
+  buf.push_back('C');
+  buf.push_back('A');
+  buf.push_back('D');
+  buf.push_back('V');
+  write_u16(buf, 1); // version
+  write_u16(buf, 0); // flags
+  write_u32(buf, n_components);
+  write_u32(buf, n_strings);
+  return buf;
+}
+
+// Owns a temp file path and removes it on destruction, so a failed REQUIRE
+// (which aborts the test via exception) can't leak the file on disk.
+struct TempFile {
+  std::string path;
+  explicit TempFile(std::string p) : path(std::move(p)) {}
+  TempFile(const TempFile &) = delete;
+  TempFile &operator=(const TempFile &) = delete;
+  TempFile(TempFile &&) = default;
+  TempFile &operator=(TempFile &&) = default;
+  ~TempFile() {
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
+  }
+  operator const std::string &() const { return path; }
+};
+
+// Write buffer to a temp file and return an owning handle to the path.
+TempFile write_tmp(const std::vector<uint8_t> &buf) {
+  static std::atomic<int> counter{0};
+  // Constructed before any I/O so its destructor covers every REQUIRE below:
+  // once the file exists on disk, a failing REQUIRE must not skip cleanup.
+  TempFile tmp((std::filesystem::temp_directory_path() /
+                ("cadvis_test_" + std::to_string(++counter) + ".cadvis"))
+                   .string());
+  std::ofstream f(tmp.path, std::ios::binary);
+  REQUIRE(f.is_open());
+  f.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
+  REQUIRE(f.good());
+  return tmp;
+}
+
+// Create a sparse file with the given logical size, without physically
+// writing that many bytes to disk. std::ifstream::tellg() (what read_cadvis
+// uses to enforce MAX_FILE_SIZE) reports the logical size regardless of how
+// the file is backed on disk, so this exercises the size-cap branch cheaply.
+TempFile write_sparse_tmp(size_t size) {
+  REQUIRE(size > 0);
+  static std::atomic<int> counter{0};
+  TempFile tmp((std::filesystem::temp_directory_path() /
+                ("cadvis_test_sparse_" + std::to_string(++counter) + ".cadvis"))
+                   .string());
+  std::ofstream f(tmp.path, std::ios::binary);
+  REQUIRE(f.is_open());
+  f.seekp(static_cast<std::streamoff>(size - 1));
+  REQUIRE(f.good());
+  f.put('\0');
+  REQUIRE(f.good());
+  return tmp;
+}
+
+} // namespace
+
+TEST_CASE("read_cadvis: rejects file exceeding size limit") {
+  constexpr size_t MAX_FILE_SIZE = 256ULL * 1024 * 1024;
+  auto path = write_sparse_tmp(MAX_FILE_SIZE + 1);
+  REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
+}
+
+TEST_CASE("read_cadvis: accepts a minimal valid file") {
+  // Happy path: a complete zero-component zero-string file loads without error.
+  auto buf = make_header(0, 0);
+  auto path = write_tmp(buf);
+  REQUIRE_NOTHROW(read_cadvis(path));
+}
+
+TEST_CASE("read_cadvis: rejects component count above limit") {
+  // n_components = MAX_COMPONENTS + 1 (0x000F4241 = 1,000,001)
+  constexpr uint32_t over = 1'000'001;
+  auto buf = make_header(over, 0); // n_strings = 0 so string pool is empty
+  auto path = write_tmp(buf);
+  REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
+}
+
+TEST_CASE("read_cadvis: rejects string pool size above limit") {
+  // n_components = 0, n_strings = 1,000,001
+  constexpr uint32_t over = 1'000'001;
+  auto buf = make_header(0, over);
+  auto path = write_tmp(buf);
+  REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
+}
+
+TEST_CASE("read_cadvis: rejects individual string length above limit") {
+  // n_components = 0, n_strings = 1, string[0].len = 65537
+  auto buf = make_header(0, 1);
+  constexpr uint32_t over_len = 65'537;
+  write_u32(buf, over_len); // string length field
+  auto path = write_tmp(buf);
+  REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
+}
+
+TEST_CASE("read_cadvis: rejects rect count above limit per component") {
+  // One component whose name is pool[0]="A", n_rects = 1,000,001, n_edges = 0
+  // String pool: one string "A"
+  auto buf = make_header(1, 1);
+  write_u32(buf, 1); // pool[0].len = 1
+  buf.push_back('A');
+  write_u32(buf, 0); // name_idx = 0
+  constexpr uint32_t over = 1'000'001;
+  write_u32(buf, over); // n_rects
+  auto path = write_tmp(buf);
+  REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
+}
+
+TEST_CASE("read_cadvis: rejects total label bytes above limit even when every "
+          "per-field cap is individually satisfied") {
+  // A single pool string at the max per-string length (64KB), referenced by
+  // enough rects that the running total-label-bytes budget (256MB) is
+  // exceeded, well before rect count, component count, or file size come
+  // anywhere near their own individual caps.
+  constexpr uint32_t big_len = 65'536;
+  constexpr uint32_t n_rects = 4'100; // 4100 * 64KB ~= 256.25MB > 256MB cap
+  auto buf = make_header(1, 1);
+  write_u32(buf, big_len); // pool[0].len
+  buf.insert(buf.end(), big_len, 'x');
+  write_u32(buf, 0);       // name_idx = 0 (also charged against the budget)
+  write_u32(buf, n_rects); // n_rects
+  write_u32(buf, 0);       // n_edges = 0
+  for (uint32_t i = 0; i < n_rects; ++i) {
+    write_u32(buf, 0); // time_lo (dummy bit pattern, value unchecked)
+    write_u32(buf, 0);
+    write_u32(buf, 0); // time_hi
+    write_u32(buf, 0);
+    write_u32(buf, 0); // out_lo
+    write_u32(buf, 0);
+    write_u32(buf, 0); // out_hi
+    write_u32(buf, 0);
+    write_u32(buf, 0); // label_idx -> pool[0], the 64KB string
+    write_u32(buf, 1); // multiplicity
+    buf.push_back(0);  // flags
+    for (int p = 0; p < 7; ++p) {
+      buf.push_back(0); // padding
+    }
+  }
+  auto path = write_tmp(buf);
+  REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
+}
+
+TEST_CASE("read_cadvis: rejects edge count above limit per component") {
+  // One component, n_rects = 0, n_edges = 1,000,001
+  auto buf = make_header(1, 1);
+  write_u32(buf, 1); // pool[0].len = 1
+  buf.push_back('A');
+  write_u32(buf, 0); // name_idx = 0
+  write_u32(buf, 0); // n_rects = 0
+  constexpr uint32_t over = 1'000'001;
+  write_u32(buf, over); // n_edges
+  auto path = write_tmp(buf);
+  REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
+}
+
+TEST_CASE("read_cadvis: rejects out-of-range label index as std::runtime_error") {
+  // One component with an empty string pool (n_strings = 0) whose name_idx
+  // points past the (empty) pool; resolve_label must reject this itself
+  // rather than let std::vector::at() throw std::out_of_range, which would
+  // violate read_cadvis's documented std::runtime_error-only contract.
+  auto buf = make_header(1, 0);
+  write_u32(buf, 0); // name_idx = 0, but pool is empty
+  write_u32(buf, 0); // n_rects = 0
+  write_u32(buf, 0); // n_edges = 0
+  auto path = write_tmp(buf);
+  REQUIRE_THROWS_AS(read_cadvis(path), std::runtime_error);
 }
