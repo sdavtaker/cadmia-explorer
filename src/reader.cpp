@@ -34,7 +34,7 @@ struct Reader {
     }
   }
 
-  size_t remaining() const { return size - pos; }
+  [[nodiscard]] size_t remaining() const { return size - pos; }
 
   // Reject counts that claim more entries than the file could possibly still
   // contain, before allocating storage for them. Without this, a truncated
