@@ -5,8 +5,6 @@
 #include <atomic>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
-#include <cstdio>
-#include <cstring>
 #include <filesystem>
 #include <fstream>
 
@@ -344,13 +342,10 @@ std::vector<uint8_t> make_header(uint32_t n_components, uint32_t n_strings) {
 
 // Write buffer to a temp file and return the path.  Caller must delete.
 std::string write_tmp(const std::vector<uint8_t> &buf) {
-  auto tmp = std::filesystem::temp_directory_path() / "cadvis_test_XXXXXX.cadvis";
-  std::string path = tmp.string();
-  // mkstemp-style: use tmpnam as fallback (test-only, not production)
   static std::atomic<int> counter{0};
-  path = (std::filesystem::temp_directory_path() /
-          ("cadvis_test_" + std::to_string(++counter) + ".cadvis"))
-             .string();
+  auto path = (std::filesystem::temp_directory_path() /
+               ("cadvis_test_" + std::to_string(++counter) + ".cadvis"))
+                  .string();
   std::ofstream f(path, std::ios::binary);
   f.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
   return path;
